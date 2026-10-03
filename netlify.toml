@@ -1,0 +1,5 @@
+# Netlify reads this file from the repository root; everything else lives in netlify/.
+[build]
+  base = "netlify"
+  command = "bash build.sh"
+  publish = "dist"

@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e5f">
+<title>Koi · Segnapunti</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c73e2e'/%3E%3Ctext x='16' y='24' font-size='22' text-anchor='middle' fill='%23fff'%3E鯉%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens ---------- */
+:root{
+  --washi:#f5ecd7; --washi-2:#ecdfc0; --paper:#fcf7ea; --line:#dccfae;
+  --ink:#2b2622; --ink-dim:#75695a;
+  --aka:#c73e2e; --aka-2:#9c2a1e;          /* vermiglio della pagoda */
+  --ai:#1f4e5f; --ai-2:#163a47;            /* indaco */
+  --mizu:#a9dedb; --mizu-2:#5bb7b9;        /* acqua del laghetto */
+  --matsu:#4d7c3a; --kin:#d2a13a; --murasaki:#8b4a8f;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+html{overflow-x:hidden; touch-action:pan-x pan-y;}   /* niente pinch-zoom: farebbe uscire dallo schermo le barre fisse */
+body{
+  margin:0; color:var(--ink); font-family:'Zen Maru Gothic',system-ui,sans-serif; min-height:100vh;
+  padding-bottom:calc(74px + env(safe-area-inset-bottom));
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'%3E%3Cg fill='none' stroke='%231f4e5f' stroke-opacity='.07'%3E%3Ccircle cx='0' cy='40' r='38'/%3E%3Ccircle cx='0' cy='40' r='26'/%3E%3Ccircle cx='0' cy='40' r='14'/%3E%3Ccircle cx='80' cy='40' r='38'/%3E%3Ccircle cx='80' cy='40' r='26'/%3E%3Ccircle cx='80' cy='40' r='14'/%3E%3Ccircle cx='40' cy='20' r='38'/%3E%3Ccircle cx='40' cy='20' r='26'/%3E%3Ccircle cx='40' cy='20' r='14'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(180deg,var(--washi),var(--washi-2));
+  background-attachment:fixed;
+}
+h1,h2,h3,.display{font-family:'Shippori Mincho',serif; font-weight:800;}
+button,input,select{font-family:inherit; font-size:inherit; color:inherit;}
+button{cursor:pointer;}
+.hidden{display:none !important;}
+img{max-width:100%; display:block;}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:9px 16px; background:linear-gradient(180deg,var(--ai),var(--ai-2)); color:#fff;
+  border-bottom:3px solid var(--aka); box-shadow:0 2px 10px rgba(22,58,71,.35);
+}
+.brand{display:flex; align-items:center; gap:10px; white-space:nowrap;}
+.brand .seal{width:34px; height:34px; border-radius:7px; background:var(--aka); display:grid; place-items:center; font-family:'Shippori Mincho',serif; font-size:21px; font-weight:800; box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);}
+.brand b{font-family:'Shippori Mincho',serif; font-size:19px; letter-spacing:2px;}
+.brand small{display:block; font-size:10px; letter-spacing:2.5px; opacity:.75; text-transform:uppercase;}
+.total-chip{display:flex; align-items:baseline; gap:6px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.3); padding:5px 14px; border-radius:999px;}
+.total-chip span{font-size:11px; letter-spacing:1px; text-transform:uppercase; opacity:.8;}
+.total-chip b{font-family:'Shippori Mincho',serif; font-size:20px;}
+
+/* ---------- Layout ---------- */
+main{max-width:980px; margin:0 auto; padding:16px 16px 40px;}
+.panel{display:none; animation:fadeIn .25s ease;}
+.panel.active{display:block;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+.card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-bottom:18px; box-shadow:0 3px 0 rgba(120,98,50,.12), 0 10px 24px rgba(90,70,30,.08);}
+.ribbon{
+  display:block; width:max-content; max-width:100%; margin:-30px auto 14px; padding:5px 34px; color:#fff; font-family:'Shippori Mincho',serif; font-weight:800;
+  font-size:15px; letter-spacing:2px; text-transform:uppercase; background:linear-gradient(180deg,#a05ca3,var(--murasaki));
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%);
+}
+.ribbon::before,.ribbon::after{content:"❀"; font-size:11px; margin:0 8px; opacity:.85; vertical-align:2px;}
+.card.has-ribbon{margin-top:30px;}
+.hint{font-size:13px; color:var(--ink-dim); margin:0 0 12px; line-height:1.45;}
+.hint a,.linkish{color:var(--ai); font-weight:700; text-decoration:underline; background:none; border:none; padding:0;}
+.empty{text-align:center; color:var(--ink-dim); font-size:14px; padding:14px 0 4px;}
+
+/* ---------- Hero ---------- */
+.pond{
+  position:relative; overflow:hidden; border-radius:var(--radius); height:118px; margin-bottom:18px; color:#fff;
+  background:radial-gradient(circle at 78% 60%,rgba(255,255,255,.35),transparent 42%), linear-gradient(135deg,#3f9ea6,var(--mizu-2) 45%,#8fd4d1);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4), 0 8px 22px rgba(31,78,95,.25);
+}
+.pond h1{position:absolute; left:18px; top:20px; margin:0; font-size:26px; letter-spacing:1px; text-shadow:0 2px 6px rgba(22,58,71,.5);}
+.pond p{position:absolute; left:18px; top:60px; margin:0; font-size:13px; max-width:60%; text-shadow:0 1px 4px rgba(22,58,71,.6);}
+.pond .linkish{color:#fff;}
+.ripple{position:absolute; border:1.5px solid rgba(255,255,255,.5); border-radius:50%; animation:ripple 5s ease-out infinite;}
+@keyframes ripple{from{transform:scale(.2); opacity:.9;} to{transform:scale(1); opacity:0;}}
+.koi{position:absolute; width:92px; animation:swim 16s linear infinite; filter:drop-shadow(0 6px 4px rgba(22,58,71,.3));}
+.koi.k2{width:64px; animation-duration:22s; animation-delay:-9s; top:72px;}
+.koi.k1{top:24px;}
+@keyframes swim{from{left:105%; transform:translateY(0) rotate(4deg);} 50%{transform:translateY(12px) rotate(-5deg);} to{left:-110px; transform:translateY(0) rotate(4deg);}}
+@media(prefers-reduced-motion:reduce){.koi,.ripple{animation:none;} .koi{left:70%;}}
+
+/* ---------- Form bits ---------- */
+.fields{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;}
+.field label{display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-dim); margin-bottom:4px; font-weight:700;}
+.field input,.field select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; min-height:42px;}
+.field input:focus,.field select:focus{outline:2px solid var(--mizu-2); outline-offset:1px;}
+.stepper{display:inline-flex; align-items:center; background:#fff; border:1px solid var(--line); border-radius:999px; overflow:hidden; flex:none;}
+.stepper button{width:36px; height:36px; border:none; background:none; font-size:20px; line-height:1; color:var(--ai); font-weight:700;}
+.stepper button:active{background:var(--mizu);}
+.stepper button:disabled{opacity:.25; cursor:default;}
+.stepper output{min-width:28px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums;}
+.row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px dashed var(--line);}
+.row:first-child{border-top:none;}
+.row .lbl{flex:1; min-width:0; font-size:14px; line-height:1.3;}
+.row .lbl small{display:block; color:var(--ink-dim); font-size:12px;}
+.pts{font-family:'Shippori Mincho',serif; font-weight:800; color:var(--aka); white-space:nowrap; min-width:54px; text-align:right;}
+.pts.zero{color:#b9ad97;}
+.btn{border:1px solid var(--line); background:#fff; padding:9px 14px; border-radius:999px; font-weight:700; font-size:14px; display:inline-flex; align-items:center; gap:7px; transition:transform .12s ease, box-shadow .12s ease;}
+.btn:hover{transform:translateY(-1px); box-shadow:0 4px 10px rgba(90,70,30,.15);}
+.btn.primary{background:linear-gradient(180deg,var(--aka),var(--aka-2)); color:#fff; border-color:var(--aka-2); padding:13px 24px; font-size:16px;}
+.btn.water{background:var(--mizu); border-color:var(--mizu-2); color:var(--ai-2);}
+.btn.small{padding:6px 11px; font-size:13px;}
+.btn.danger{color:var(--aka-2);}
+.btns{display:flex; flex-wrap:wrap; gap:8px;}
+.hex{display:inline-block; width:15px; height:17px; background:var(--mizu-2); clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); margin-right:-2px;}
+.hexes{display:inline-flex; padding-right:4px;}
+.xbtn{border:none; background:none; color:var(--ink-dim); font-size:22px; line-height:1; width:32px; height:32px; border-radius:50%; flex:none;}
+.xbtn:hover{background:rgba(199,62,46,.12); color:var(--aka);}
+.toggle{border:1px solid var(--line); background:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; color:var(--ink-dim);}
+.toggle.on{background:var(--ai); border-color:var(--ai); color:#fff;}
+.toggle.on::before{content:"✓ ";}
+.seg{display:inline-flex; flex-wrap:wrap; gap:6px;}
+.seg button{border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; font-size:13px; font-weight:700; color:var(--ink-dim);}
+.seg button.on{background:var(--ai); border-color:var(--ai); color:#fff;}
+
+/* ---------- Carpe ---------- */
+.carp{border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg,#fff,#f4fbfa); padding:10px 12px; margin-top:10px;}
+.carp.cent{background:linear-gradient(180deg,#fff,#fdf3dc);}
+.carp-head{display:flex; align-items:center; gap:8px;}
+.carp-head b{flex:1; font-size:15px;}
+.carp-ctl{display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-top:8px;}
+.mini{display:flex; align-items:center; gap:8px; font-size:13px;}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;}
+.chip{font-size:12px; background:var(--washi); border:1px solid var(--line); border-radius:999px; padding:3px 10px; color:var(--ink-dim);}
+.chip b{color:var(--ink);}
+.objgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px;}
+.obj{border:1px solid var(--line); border-radius:12px; background:#fff; padding:10px 12px;}
+.obj-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:2px;}
+.obj-head b{font-family:'Shippori Mincho',serif; font-size:15px; color:var(--murasaki); letter-spacing:.5px;}
+.obj small{display:block; color:var(--ink-dim); font-size:12px; margin-bottom:8px; line-height:1.35;}
+
+/* ---------- Foto ---------- */
+.photo-prev{position:relative; margin-top:12px; border-radius:12px; overflow:hidden; border:1px solid var(--line); max-width:420px;}
+.photo-prev .xbtn{position:absolute; top:6px; right:6px; background:rgba(255,255,255,.9);}
+input[type=file]{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;}
+
+/* ---------- Riepilogo ---------- */
+.summary{display:grid; grid-template-columns:1fr auto; gap:18px; align-items:center;}
+.sumlist{margin:0; padding:0; list-style:none;}
+.sumlist li{display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed var(--line); font-size:14px;}
+.sumlist li b{font-family:'Shippori Mincho',serif;}
+.hanko{
+  width:128px; height:128px; border-radius:50%; background:var(--aka); color:#fff; display:grid; place-content:center; text-align:center;
+  box-shadow:inset 0 0 0 4px var(--aka), inset 0 0 0 6px rgba(255,255,255,.75), 0 6px 16px rgba(156,42,30,.35); transform:rotate(-6deg);
+}
+.hanko b{font-family:'Shippori Mincho',serif; font-size:44px; line-height:1;}
+.hanko span{font-size:12px; letter-spacing:3px;}
+.solo-box{margin-top:14px; padding:12px; border-radius:12px; background:var(--washi); border:1px solid var(--line);}
+.solo-title{font-family:'Shippori Mincho',serif; font-size:18px; font-weight:800; color:var(--ai); margin-top:8px;}
+.solo-title.fail{color:var(--aka-2);}
+.edit-banner{background:#fdf3dc; border:1px solid var(--kin); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:14px;}
+@media(max-width:480px){.summary{grid-template-columns:1fr;} .hanko{margin:0 auto;} .pond p{max-width:75%;} .ribbon{font-size:13px; letter-spacing:1px; padding:5px 22px; white-space:nowrap;} .ribbon::before,.ribbon::after{margin:0 5px;}}
+
+/* ---------- Partite ---------- */
+.match-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;}
+.match-head h3{margin:0; font-size:17px; color:var(--ai);}
+.match-head input{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:13px;}
+.score{border-top:1px dashed var(--line);}
+.score summary{display:flex; align-items:center; gap:10px; padding:10px 0; cursor:pointer; list-style:none;}
+.score summary::-webkit-details-marker{display:none;}
+.rank{width:28px; height:28px; border-radius:50%; background:var(--washi-2); display:grid; place-items:center; font-weight:700; font-size:13px; flex:none;}
+.score.win .rank{background:var(--kin); color:#fff;}
+.score .who{flex:1; min-width:0; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.score .who small{display:block; font-weight:400; color:var(--ink-dim); font-size:12px;}
+.score .thumb{width:44px; height:44px; border-radius:8px; object-fit:cover; border:1px solid var(--line); flex:none;}
+.score .tot{font-family:'Shippori Mincho',serif; font-weight:800; font-size:22px; color:var(--aka);}
+.score .detail{padding:0 0 12px 38px;}
+.score .detail img{border-radius:10px; margin:10px 0; max-height:320px; cursor:zoom-in; border:1px solid var(--line);}
+
+/* ---------- Libro ---------- */
+.desk{
+  border-radius:var(--radius); padding:18px 8px 12px; margin-bottom:14px; overflow:hidden; touch-action:pan-y;
+  background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.14),transparent 60%), linear-gradient(180deg,#234f5e,#16323d);
+  box-shadow:inset 0 0 40px rgba(0,0,0,.35);
+}
+.book{position:relative; margin:0 auto; perspective:2400px; transition:transform .6s ease; user-select:none; -webkit-user-select:none; cursor:pointer;}
+.book::after{content:""; position:absolute; left:4%; right:4%; bottom:-10px; height:18px; background:radial-gradient(ellipse at center,rgba(0,0,0,.5),transparent 70%); z-index:0;}
+.leaf{position:absolute; top:0; transform-origin:left center; transform-style:preserve-3d; will-change:transform;}
+.face{position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; background:#f7efd8 linear-gradient(135deg,#fbf5e3,#eadfc2); overflow:hidden; box-shadow:0 0 0 1px rgba(60,45,20,.18);}
+.face.front{border-radius:2px 6px 6px 2px;}
+.face.back{transform:rotateY(180deg); border-radius:6px 2px 2px 6px;}
+.face img{width:100%; height:100%; pointer-events:none;}
+.shade{position:absolute; inset:0; pointer-events:none;}
+.front .shade{background:linear-gradient(90deg,rgba(40,25,5,.3),rgba(40,25,5,.07) 5%,transparent 13%);}
+.back .shade{background:linear-gradient(270deg,rgba(40,25,5,.3),rgba(40,25,5,.07) 5%,transparent 13%);}
+.shade::after{content:""; position:absolute; inset:0; background:#2a1a05; opacity:var(--sh,0);}
+.edge{position:absolute; top:3px; bottom:3px; background:repeating-linear-gradient(90deg,#f1e7cd 0 1px,#c9bb97 1px 2px); z-index:0; box-shadow:0 2px 6px rgba(0,0,0,.4);}
+.book-ctl{display:flex; align-items:center; justify-content:center; gap:10px; margin-top:18px; color:#fff;}
+.book-ctl .btn{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.3); color:#fff;}
+.book-ctl .btn:disabled{opacity:.3; cursor:default; transform:none;}
+.book-ctl span{min-width:120px; text-align:center; font-size:14px; letter-spacing:.5px;}
+.toc{display:flex; flex-wrap:wrap; gap:6px; justify-content:center;}
+.toc button{border:1px solid var(--line); background:var(--paper); border-radius:999px; padding:7px 13px; font-size:13px; font-weight:700; color:var(--ai);}
+.toc button small{color:var(--ink-dim); font-weight:400; margin-left:4px;}
+
+/* ---------- Overlay (zoom pagina / foto) ---------- */
+.overlay{position:fixed; inset:0; z-index:60; background:rgba(15,28,34,.94); display:flex; flex-direction:column;}
+.ov-bar{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; color:#fff;}
+.ov-bar .btn{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.3); color:#fff; min-width:42px; justify-content:center;}
+.ov-scroll{flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:0 0 env(safe-area-inset-bottom);}
+.ov-scroll img{margin:0 auto; max-width:none; background:#f7efd8;}
+
+/* ---------- Tab bar ---------- */
+.tabbar{
+  position:fixed; bottom:0; left:0; right:0; z-index:30; display:flex; background:rgba(252,247,234,.96); backdrop-filter:blur(6px);
+  border-top:1px solid var(--line); padding:6px 10px calc(6px + env(safe-area-inset-bottom)); box-shadow:0 -4px 14px rgba(90,70,30,.1);
+}
+.tab-btn{flex:1; background:none; border:none; color:var(--ink-dim); display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 4px; font-size:11px; letter-spacing:.5px; border-radius:12px; font-weight:700;}
+.tab-btn svg{width:22px; height:22px;}
+.tab-btn.active{color:var(--aka); background:rgba(199,62,46,.09); box-shadow:inset 0 -3px 0 var(--aka);}
+.toast{position:fixed; left:50%; bottom:calc(88px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:var(--ai-2); color:#fff; padding:10px 18px; border-radius:999px; font-size:14px; z-index:70; box-shadow:0 6px 18px rgba(0,0,0,.3); max-width:90vw; text-align:center;}
+
+/* ---------- Profilo, modalità, icone ---------- */
+.profile-btn{display:block; background:none; border:none; padding:0; color:#fff; opacity:.85; font-size:12px; letter-spacing:.5px; text-decoration:underline dotted; text-underline-offset:3px; max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.overlay.profile{align-items:center; justify-content:center; padding:16px; background:rgba(15,28,34,.8);}
+.profile-card{background:var(--paper); border-radius:18px; padding:26px 22px; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.4); border:1px solid var(--line);}
+.profile-card h2{margin:12px 0 6px; color:var(--ai);}
+.profile-card .field{text-align:left;}
+.seal.big{width:58px; height:58px; margin:0 auto; border-radius:12px; background:var(--aka); color:#fff; display:grid; place-items:center; font-family:'Shippori Mincho',serif; font-size:36px; font-weight:800; box-shadow:inset 0 0 0 3px rgba(255,255,255,.35);}
+.switch{display:grid; grid-template-columns:1fr 1fr; background:var(--washi-2); border-radius:999px; padding:4px; max-width:420px; margin:0 auto;}
+.switch button{border:none; background:none; border-radius:999px; padding:11px 10px; font-weight:700; color:var(--ink-dim); transition:background .2s, color .2s;}
+.switch button.on{background:linear-gradient(180deg,var(--aka),var(--aka-2)); color:#fff; box-shadow:0 3px 8px rgba(156,42,30,.3);}
+.scen{margin-top:14px; text-align:center;}
+.scen small{display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-dim); margin-bottom:6px; font-weight:700;}
+.scen .seg{justify-content:center;}
+.ico{height:26px; width:auto; flex:none;}
+.ico.big{height:40px; max-width:64px; object-fit:contain;}
+.btn .ico{margin:-4px 0;}
+/* Carpe: le icone mantengono la proporzione tra tessere da 1, 2 e 3 esagoni. */
+.ico[src*="carp-"]{height:32px;}
+.ico[src*="carp-l"]{height:54px;}
+.ico.big[src*="carp-"]{height:46px; max-width:none;}
+.ico.big[src*="carp-l"]{height:78px;}
+.auto{min-width:36px; text-align:center; font-size:17px; background:var(--washi); border:1px solid var(--line); border-radius:999px; padding:5px 12px;}
+.pick{display:grid; grid-template-columns:repeat(auto-fill,minmax(82px,1fr)); gap:8px; margin-bottom:10px;}
+.pick button{position:relative; border:2px solid var(--line); background:#fff; border-radius:12px; padding:8px 4px 6px; display:flex; flex-direction:column; align-items:center; gap:5px; opacity:.8; filter:grayscale(.55); transition:opacity .15s, filter .15s, transform .15s;}
+.pick button img{height:88px; width:auto; max-width:100%; object-fit:contain; border-radius:5px;}
+.pick button span{font-size:11px; font-weight:700; line-height:1.2; color:var(--ink-dim);}
+.pick button.on{opacity:1; filter:none; border-color:var(--aka); background:#fff8ee; box-shadow:0 4px 12px rgba(199,62,46,.2); transform:translateY(-2px);}
+.pick button.on span{color:var(--ink);}
+#objPick{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));}
+#objPick img{height:124px; border-radius:7px;}
+.pick button.on::after{content:"✓"; position:absolute; top:-8px; right:-8px; width:22px; height:22px; border-radius:50%; background:var(--aka); color:#fff; font-size:13px; font-weight:700; display:grid; place-items:center;}
+.obj-head{align-items:center;}
+.obj-head b{flex:1;}
+.obj .carp-ctl{margin-top:0;}
+
+/* ---------- Partite: vincitore, pennina, sincronizzazione ---------- */
+.sync{text-align:center; font-size:12px; color:var(--ink-dim); margin:-4px 0 12px;}
+.sync.err{color:var(--aka-2);}
+.winner{display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,#fdf0c8,#f6dc8f); border:1px solid var(--kin); border-radius:12px; padding:10px 14px; margin-bottom:6px;}
+.winner > div{flex:1; min-width:0;}
+.winner small{display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#8a6515; font-weight:700;}
+.winner b{font-family:'Shippori Mincho',serif; font-size:20px; overflow:hidden; text-overflow:ellipsis; display:block;}
+.winner .tot{font-family:'Shippori Mincho',serif; font-weight:800; font-size:26px; color:var(--aka);}
+.kachi{width:42px; height:42px; border-radius:50%; background:var(--aka); color:#fff; display:grid; place-items:center; font-family:'Shippori Mincho',serif; font-size:24px; font-weight:800; flex:none; box-shadow:inset 0 0 0 2px rgba(255,255,255,.6);}
+.pen{border:1px solid var(--line); background:#fff; width:36px; height:36px; border-radius:50%; display:grid; place-items:center; color:var(--ai); flex:none;}
+.pen svg{width:17px; height:17px;}
+.pen:hover{background:var(--mizu);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="seal">鯉</div>
+    <div><b>KOI</b><button class="profile-btn" data-act="profile" id="profileBtn" aria-label="Modifica profilo"></button></div>
+  </div>
+  <div class="total-chip" id="totalChip"><span>Totale</span><b id="chipTotal">0</b><span>PV</span></div>
+</header>
+
+<main>
+  <!-- ================= PUNTEGGIO ================= -->
+  <section class="panel active" id="panel-calc">
+    <div class="pond">
+      <i class="ripple" style="width:150px;height:150px;right:6%;top:-20px;"></i>
+      <i class="ripple" style="width:90px;height:90px;right:30%;top:40px;animation-delay:-2.4s;"></i>
+      <svg class="koi k1" viewBox="0 0 120 50"><path d="M6 25c14-17 48-21 72-8 9 5 15 3 24-8 3 11 3 21 0 32-9-11-15-13-24-8-24 13-58 9-72-8z" fill="#fff"/><path d="M22 14c10-5 22-5 30-2-2 8-12 12-22 10-6-1-9-4-8-8zm36 20c8-1 15-4 20-9 3 4 2 9-4 13-6 3-13 2-16-4z" fill="#e2552f"/><circle cx="16" cy="22" r="2" fill="#2b2622"/></svg>
+      <svg class="koi k2" viewBox="0 0 120 50"><path d="M6 25c14-17 48-21 72-8 9 5 15 3 24-8 3 11 3 21 0 32-9-11-15-13-24-8-24 13-58 9-72-8z" fill="#f2b93b"/><path d="M30 12c9-3 18-3 26 0-4 6-14 8-22 6-3-1-5-3-4-6z" fill="#fff" opacity=".7"/><circle cx="16" cy="22" r="2" fill="#2b2622"/></svg>
+      <h1>Calcolo del punteggio</h1>
+      <p>Conta i Punti Vittoria del tuo laghetto. <button class="linkish" data-act="rules" data-page="11">Regole a pag. 11</button></p>
+    </div>
+
+    <div class="edit-banner hidden" id="editBanner"><span id="editText"></span><button class="btn small" data-act="cancel-edit">Annulla modifica</button></div>
+
+    <div class="card" id="modeBox"></div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Carpe</span>
+      <p class="hint" id="carpHint"></p>
+      <div class="btns">
+        <button class="btn water" data-act="add-carp" data-size="s"><img class="ico" src="img/carp-s.png" alt="">Piccola · 2</button>
+        <button class="btn water" data-act="add-carp" data-size="m"><img class="ico" src="img/carp-m.png" alt="">Media · 4</button>
+        <button class="btn water" data-act="add-carp" data-size="l"><img class="ico" src="img/carp-l.png" alt="">Grande · 6</button>
+      </div>
+      <div id="carpList"></div>
+    </div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Lanterne</span>
+      <p class="hint">Ogni Lanterna vale 1 PV per ogni esagono (libero o occupato) in linea retta davanti a essa.</p>
+      <button class="btn water" data-act="add-lantern"><img class="ico" src="img/lanterna.png" alt="">Aggiungi lanterna</button>
+      <div id="lanternList"></div>
+    </div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Pergamene</span>
+      <p class="hint">Tocca le carte Pergamena che possiedi.</p>
+      <div class="pick" id="pergPick"></div>
+      <div id="pergList"></div>
+    </div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Obiettivi</span>
+      <p class="hint">Tocca gli obiettivi che hai reclamato.</p>
+      <div class="pick" id="objPick"></div>
+      <div class="objgrid" id="objList"></div>
+    </div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Fortuna e monete</span>
+      <div id="miscList"></div>
+    </div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Foto del laghetto</span>
+      <div class="btns">
+        <label class="btn water" for="photoCam">Scatta una foto</label>
+        <label class="btn" for="photoFile">Scegli un'immagine</label>
+        <input type="file" id="photoCam" accept="image/*" capture="environment">
+        <input type="file" id="photoFile" accept="image/*">
+      </div>
+      <div id="photoPrev"></div>
+    </div>
+
+    <div class="card has-ribbon">
+      <span class="ribbon">Punteggio finale</span>
+      <div class="summary">
+        <ul class="sumlist" id="sumList"></ul>
+        <div class="hanko"><b id="hankoTotal">0</b><span>PV</span></div>
+      </div>
+      <div id="soloBox"></div>
+      <div class="btns" style="margin-top:16px; justify-content:space-between;">
+        <button class="btn danger" data-act="reset">Azzera</button>
+        <button class="btn primary" data-act="save" id="saveBtn">Invia punteggio</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PARTITE ================= -->
+  <section class="panel" id="panel-matches">
+    <div class="sync" id="syncBox"></div>
+    <div id="matchList"></div>
+  </section>
+
+  <!-- ================= REGOLAMENTO ================= -->
+  <section class="panel" id="panel-rules">
+    <div class="desk" id="desk">
+      <div class="book" id="book"></div>
+      <div class="book-ctl">
+        <button class="btn" data-act="book-prev" id="bookPrev" aria-label="Pagina precedente">‹</button>
+        <span id="bookPos"></span>
+        <button class="btn" data-act="book-next" id="bookNext" aria-label="Pagina successiva">›</button>
+        <button class="btn" data-act="book-zoom" aria-label="Ingrandisci">Ingrandisci</button>
+      </div>
+    </div>
+    <p class="hint" style="text-align:center;" id="bookHint"></p>
+    <div class="toc" id="toc"></div>
+  </section>
+</main>
+
+<nav class="tabbar">
+  <button class="tab-btn active" data-tab="calc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c3-5 10-6 15-2 2 1.500 3 1 5-2 .6 3 .6 5 0 8-2-3-3-3.500-5-2-5 4-12 3-15-2z"/><circle cx="6.500" cy="11" r=".6" fill="currentColor"/></svg>Punteggio</button>
+  <button class="tab-btn" data-tab="matches"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Partite</button>
+  <button class="tab-btn" data-tab="rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.500-5-2-9-2v14c4 0 7 .5 9 2 2-1.500 5-2 9-2V4c-4 0-7 .5-9 2zM12 6v14"/></svg>Regolamento</button>
+</nav>
+
+<script src="config.js"></script>
+<script>
+/* ---------- Dati di gioco (dal regolamento) ---------- */
+const CARP = {
+  s:{name:"Carpa piccola", pv:2, img:"carp-s"},
+  m:{name:"Carpa media", pv:4, img:"carp-m"},
+  l:{name:"Carpa grande", pv:6, img:"carp-l"},
+  c:{name:"Carpa centenaria", pv:8, img:"tile-centenaria"},
+};
+// auto: il conteggio arriva dalle sezioni Carpe e Lanterne; altrimenti va chiesto al giocatore.
+const PERG = [
+  {k:"ninfea", pv:2, cap:"Ninfee", ask:"Ninfee nel laghetto"},
+  {k:"small", pv:2, cap:"Carpe piccole", auto:"Carpe piccole nel laghetto"},
+  {k:"medium", pv:3, cap:"Carpe medie", auto:"Carpe medie nel laghetto"},
+  {k:"large", pv:4, cap:"Carpe grandi", auto:"Carpe grandi nel laghetto"},
+  {k:"lanterna", pv:2, cap:"Lanterne", auto:"Lanterne nel laghetto"},
+  {k:"pozzo", pv:2, cap:"Carte Pozzo", ask:"Carte Pozzo prese"},
+  {k:"mercato", pv:3, cap:"Carte Mercato", ask:"Carte Mercato prese"},
+  {k:"magazzino", pv:3, cap:"Carte Magazzino", ask:"Carte Magazzino prese"},
+];
+const OBJ = [
+  {k:"centenaria", name:"Carpa centenaria"}, {k:"cascata", name:"Cascata"}, {k:"viola", name:"Ninfea viola"},
+  {k:"percorso", name:"Percorso"}, {k:"ponticello", name:"Ponticello"}, {k:"rami", name:"Rami"},
+  {k:"salice", name:"Salice piangente"}, {k:"shishi", name:"Shishi odoshi"}, {k:"statua", name:"Statua"}, {k:"tartaruga", name:"Tartaruga"},
+];
+const PERCORSO = [0,3,6,12,18];          // 1/2/3/4+ tessere
+const TARTARUGA = [0,1,2,4,8,12,16];     // 1..6 tessere Acqua libere adiacenti
+const MODES = {
+  multi:{name:"Multigiocatore"},
+  solo:{name:"Solitario", short:"Classico", th:[60,80,100]},
+  estate:{name:"Estate torrida", short:"Estate torrida", th:[50,70,90]},
+  sentiero:{name:"Sentiero illuminato", short:"Sentiero illuminato", th:[50,70,90]},
+  imperiale:{name:"Laghetto imperiale", short:"Laghetto imperiale", th:[50,70,90]},
+};
+const TITLES = ["Gakusei (allievo)","Senmon (esperto)","Sensei (maestro)"];
+const PARTS = [["Carpe","carpe"],["Lanterne","lanterne"],["Pergamene","pergamene"],["Obiettivi","obiettivi"],["Fortuna","fortuna"]];
+// I punteggi multigiocatore inviati a meno di 15 minuti l'uno dall'altro finiscono nella stessa partita.
+const MERGE_WINDOW = 15 * 60 * 1000;
+const SYNC_URL = (window.KOI_SYNC_URL || "").replace(/\/+$/, "");
+
+/* ---------- Stato ---------- */
+const STORAGE_KEY = "koiCalc.v2";
+const $ = s => document.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sum = a => a.reduce((x,y) => x+y, 0);
+const clone = o => JSON.parse(JSON.stringify(o));
+function newDraft(keep){
+  return {
+    editId:"", solo:!!(keep && keep.solo), scenario:(keep && keep.scenario) || "solo",
+    carps:[], lanterns:[],
+    counts:{ninfee:0, pozzo:0, mercato:0, magazzino:0},
+    perg:{ninfea:false, small:false, medium:false, large:false, lanterna:false, pozzo:false, mercato:false, magazzino:false},
+    obj:{
+      centenaria:{on:false, ninfee:0, viola:0, surrounded:false}, cascata:{on:false, full:false}, viola:{on:false},
+      percorso:{on:false, n:1}, ponticello:{on:false, n:0}, rami:{on:false, s:false, m:false, l:false}, salice:{on:false},
+      shishi:{on:false, n:0}, statua:{on:false, n:0}, tartaruga:{on:false, n:0},
+    },
+    fortuna:0, coins:0, soloReq:false, photoId:"",
+  };
+}
+const modeOf = d => d.solo ? d.scenario : "multi";
+// Punteggi salvati quando si poteva indicare un solo ramo (campo "size").
+function upgradeDraft(d){
+  const r = d.obj.rami;
+  if(r.size !== undefined){ r.s = r.size === 10; r.m = r.size === 15; r.l = r.size === 20; delete r.size; }
+  return d;
+}
+let state = {profile:null, scores:[], draft:newDraft()};
+try{
+  const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  if(raw && Array.isArray(raw.scores)){
+    state.profile = raw.profile || null;
+    state.scores = raw.scores;
+    if(raw.draft && raw.draft.obj) state.draft = upgradeDraft(Object.assign(newDraft(), raw.draft));
+  }
+}catch(e){}
+function persist(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ toast("Memoria del browser piena: impossibile salvare"); }
+}
+const findScore = id => state.scores.find(s => s.id === id && !s.deleted);
+const isMine = s => !!state.profile && s.userId === state.profile.id;
+
+/* ---------- Foto (IndexedDB, più copia sul database condiviso) ---------- */
+let dbp;
+function db(){
+  return dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open("koiCalc", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("photos");
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+}
+async function photoTx(mode, fn){
+  const d = await db();
+  return new Promise((res, rej) => {
+    const rq = fn(d.transaction("photos", mode).objectStore("photos"));
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  });
+}
+const photoUrls = new Map();
+async function photoUrl(id){
+  if(!id) return "";
+  if(!photoUrls.has(id)){
+    let blob = await photoTx("readonly", s => s.get(id)).catch(() => null);
+    if(!blob && canSync()){          // foto di un amico: scaricala una volta e tienila in cache
+      try{
+        const dataUrl = await api("GET", "photos/" + id);
+        if(dataUrl){ blob = await (await fetch(dataUrl)).blob(); photoTx("readwrite", s => s.put(blob, id)).catch(() => {}); }
+      }catch(e){}
+    }
+    if(!blob) return "";
+    photoUrls.set(id, URL.createObjectURL(blob));
+  }
+  return photoUrls.get(id);
+}
+function photoDelete(id){
+  if(!id) return;
+  if(photoUrls.has(id)){ URL.revokeObjectURL(photoUrls.get(id)); photoUrls.delete(id); }
+  photoTx("readwrite", s => s.delete(id)).catch(() => {});
+  if(canSync()) api("DELETE", "photos/" + id).catch(() => {});
+}
+// Le foto del telefono sono enormi: le riduciamo prima di salvarle.
+async function shrink(file){
+  let src;
+  try{ src = await createImageBitmap(file, {imageOrientation:"from-image"}); }
+  catch(e){
+    src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); });
+  }
+  const k = Math.min(1, 1280 / Math.max(src.width, src.height));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
+  cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
+  return new Promise(res => cv.toBlob(res, "image/jpeg", .8));
+}
+async function onPhoto(e){
+  const file = e.target.files[0]; e.target.value = "";
+  if(!file) return;
+  try{
+    const blob = await shrink(file), id = uid();
+    await photoTx("readwrite", s => s.put(blob, id));
+    dropDraftPhoto();
+    state.draft.photoId = id;
+    render();
+  }catch(err){ toast("Impossibile caricare la foto"); }
+}
+// Non cancellare la foto di un punteggio già inviato finché la modifica non viene confermata.
+function dropDraftPhoto(){
+  const d = state.draft, saved = d.editId && findScore(d.editId);
+  if(d.photoId && !(saved && saved.photoId === d.photoId)) photoDelete(d.photoId);
+  d.photoId = "";
+}
+async function hydratePhotos(root){
+  for(const img of root.querySelectorAll("img[data-photo]")){
+    const u = await photoUrl(img.dataset.photo);
+    if(u) img.src = u; else img.remove();
+  }
+}
+
+/* ---------- Sincronizzazione (Firebase Realtime Database via REST) ---------- */
+let syncState = SYNC_URL ? "busy" : "off", syncing = false, syncedAt = 0;
+// I dati stanno sotto groups/<codice>: le regole del database non permettono di elencare i gruppi,
+// quindi chi non conosce il codice non può leggere né modificare le partite.
+const canSync = () => !!(SYNC_URL && state.profile && state.profile.group);
+const groupCode = v => v.trim().toLowerCase().replace(/[.$#\[\]\/\s]+/g, "-");
+async function api(method, path, body){
+  const r = await fetch(`${SYNC_URL}/groups/${encodeURIComponent(state.profile.group)}/${path}.json`, {method, body:body === undefined ? undefined : JSON.stringify(body)});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+const blobToDataUrl = blob => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+async function sync(){
+  if(!canSync() || syncing) return;
+  syncing = true;
+  const before = JSON.stringify(state.scores);
+  try{
+    for(const s of state.scores.filter(x => x.dirty)){
+      if(s.photoPending && s.photoId && !s.deleted){
+        const blob = await photoTx("readonly", st => st.get(s.photoId));
+        if(blob) await api("PUT", "photos/" + s.photoId, await blobToDataUrl(blob));
+      }
+      const rec = Object.assign({}, s, {data:JSON.stringify(s.data || {})});   // Firebase scarta array e oggetti vuoti
+      delete rec.dirty; delete rec.photoPending;
+      await api("PUT", "scores/" + s.id, rec);
+      s.dirty = false; s.photoPending = false;
+    }
+    const remote = (await api("GET", "scores")) || {};
+    for(const r of Object.values(remote)){
+      if(!r || !r.id) continue;
+      if(typeof r.data === "string"){ try{ r.data = JSON.parse(r.data); }catch(e){ r.data = {}; } }
+      const i = state.scores.findIndex(s => s.id === r.id);
+      if(i < 0) state.scores.push(r);
+      else if(!state.scores[i].dirty && (r.updated || 0) > (state.scores[i].updated || 0)) state.scores[i] = r;
+    }
+    state.scores = state.scores.filter(s => s.dirty || remote[s.id]);
+    syncState = "ok"; syncedAt = Date.now();
+  }catch(e){ syncState = "err"; }
+  syncing = false;
+  persist(); renderSync();
+  if(JSON.stringify(state.scores) !== before) renderMatches();
+}
+
+/* ---------- Calcolo ---------- */
+function carpScore(c, mode, viola){
+  const v = CARP[c.size].pv + c.ninfee + (viola ? 2 * c.viola : 0);
+  if(c.surrounded) return v * 2;
+  return mode === "estate" ? 0 : v;     // Estate torrida: le carpe non circondate non danno punti
+}
+function compute(d){
+  const mode = modeOf(d), o = d.obj, viola = o.viola.on;
+  const n = k => d.carps.filter(c => c.size === k).length;
+  const cnt = {ninfea:d.counts.ninfee, small:n("s"), medium:n("m"), large:n("l"), lanterna:d.lanterns.length,
+               pozzo:d.counts.pozzo, mercato:d.counts.mercato, magazzino:d.counts.magazzino};
+  const objPts = {
+    centenaria:carpScore(Object.assign({size:"c"}, o.centenaria), mode, viola),
+    cascata:o.cascata.full ? 16 : 8, viola:0, percorso:PERCORSO[Math.min(o.percorso.n, 4)], ponticello:o.ponticello.n,
+    rami:(o.rami.s ? 10 : 0) + (o.rami.m ? 15 : 0) + (o.rami.l ? 20 : 0), salice:8, shishi:o.shishi.n * 3, statua:o.statua.n * 4, tartaruga:TARTARUGA[o.tartaruga.n],
+  };
+  OBJ.forEach(x => { if(!o[x.k].on) objPts[x.k] = 0; });
+  const pergPts = {};
+  PERG.forEach(p => pergPts[p.k] = d.perg[p.k] ? p.pv * cnt[p.k] : 0);
+  const parts = {
+    carpe:sum(d.carps.map(c => carpScore(c, mode, viola))),
+    lanterne:sum(d.lanterns),
+    pergamene:sum(Object.values(pergPts)),
+    obiettivi:sum(Object.values(objPts)),
+    fortuna:d.fortuna,
+  };
+  return {parts, cnt, objPts, pergPts, claimed:OBJ.filter(x => o[x.k].on).length, total:sum(Object.values(parts))};
+}
+function soloResult(d, r){
+  const m = MODES[modeOf(d)];
+  if(!m.th) return null;
+  let lvl = m.th.filter(t => r.total >= t).length - 1;
+  if(d.scenario === "imperiale"){
+    if(r.claimed < 4) return {ok:false, text:"Servono almeno 4 obiettivi reclamati (ne hai " + r.claimed + ")"};
+    if(r.claimed < 5) lvl = Math.min(lvl, 0);   // con 4 obiettivi si arriva al massimo a Gakusei
+  }else if(!d.soloReq){
+    return {ok:false, text:"Requisito sugli obiettivi non soddisfatto"};
+  }
+  if(lvl < 0) return {ok:false, text:"Punteggio insufficiente (minimo " + m.th[0] + " PV)"};
+  return {ok:true, text:TITLES[lvl]};
+}
+
+/* ---------- Render: punteggio ---------- */
+function stepper(path, val, min, max){
+  const b = (d, sym, off) => `<button data-act="step" data-path="${path}" data-d="${d}" data-min="${min}" data-max="${max}" ${off ? "disabled" : ""} aria-label="${d > 0 ? "Aumenta" : "Diminuisci"}">${sym}</button>`;
+  return `<div class="stepper">${b(-1, "−", val <= min)}<output>${val}</output>${b(1, "+", val >= max)}</div>`;
+}
+const pts = v => `<span class="pts ${v ? "" : "zero"}">${v} PV</span>`;
+const ico = (name, cls) => `<img class="ico ${cls || ""}" src="img/${name}.png" alt="">`;
+function row(label, small, ctl, v, icon){
+  return `<div class="row">${icon || ""}<div class="lbl">${label}${small ? `<small>${small}</small>` : ""}</div>${ctl}${v === undefined ? "" : pts(v)}</div>`;
+}
+function seg(path, cur, opts){
+  return `<div class="seg">${opts.map(([v, t]) => `<button class="${cur === v ? "on" : ""}" data-act="set" data-path="${path}" data-val="${v}">${t}</button>`).join("")}</div>`;
+}
+const toggle = (path, on, text) => `<button class="toggle ${on ? "on" : ""}" data-act="toggle" data-path="${path}">${text}</button>`;
+const mini = (ctl, text, icon) => `<div class="mini">${ctl}${icon || ""}${text}</div>`;
+// Controlli comuni a tutte le carpe (centenaria compresa).
+function carpCtl(path, c, viola){
+  return `<div class="carp-ctl">${mini(stepper(path + ".ninfee", c.ninfee, 0, 12), "Ninfee adiacenti", ico("ninfea"))}${
+    viola ? mini(stepper(path + ".viola", c.viola, 0, 2), "Ninfee viola adiacenti", ico("tile-viola")) : ""}${
+    toggle(path + ".surrounded", c.surrounded, "Circondata dall'acqua ×2")}</div>`;
+}
+
+function render(){
+  const d = state.draft, r = compute(d), mode = modeOf(d), o = d.obj, viola = o.viola.on;
+
+  $("#modeBox").innerHTML = `<div class="switch" role="group" aria-label="Numero di giocatori">
+      <button class="${d.solo ? "on" : ""}" data-act="solo" data-val="1">Solo</button>
+      <button class="${d.solo ? "" : "on"}" data-act="solo" data-val="0">Multigiocatore</button>
+    </div>${d.solo ? `<div class="scen"><small>Modalità solitario</small>${seg("scenario", d.scenario, ["solo","estate","sentiero","imperiale"].map(k => [k, MODES[k].short]))}</div>` : ""}`;
+
+  $("#carpHint").innerHTML = "Ogni carpa vale i punti della sua taglia, +1 PV per ogni Ninfea adiacente. Se è completamente circondata dall'acqua (lati azzurri) il suo valore raddoppia."
+    + (mode === "estate" ? " <b>Estate torrida:</b> le carpe non circondate valgono 0 PV." : "");
+  $("#carpList").innerHTML = d.carps.length ? d.carps.map((c, i) => `
+    <div class="carp">
+      <div class="carp-head">${ico(CARP[c.size].img, "big")}<b>${CARP[c.size].name}</b>${pts(carpScore(c, mode, viola))}<button class="xbtn" data-act="del" data-path="carps" data-i="${i}" aria-label="Rimuovi carpa">×</button></div>
+      ${carpCtl("carps." + i, c, viola)}
+    </div>`).join("") : `<p class="empty">Nessuna carpa: aggiungi quelle presenti nel tuo laghetto.</p>`;
+
+  $("#lanternList").innerHTML = d.lanterns.map((n, i) =>
+    `<div class="row">${ico("lanterna", "big")}<div class="lbl">Lanterna ${i + 1}<small>esagoni in linea retta davanti</small></div>${stepper(`lanterns.${i}`, n, 0, 40)}${pts(n)}<button class="xbtn" data-act="del" data-path="lanterns" data-i="${i}" aria-label="Rimuovi lanterna">×</button></div>`).join("");
+
+  $("#pergPick").innerHTML = PERG.map(p =>
+    `<button class="${d.perg[p.k] ? "on" : ""}" data-act="toggle" data-path="perg.${p.k}" aria-pressed="${d.perg[p.k]}"><img src="img/perg-${p.k}.jpg" alt=""><span>${p.pv} PV · ${p.cap}</span></button>`).join("");
+  $("#pergList").innerHTML = PERG.filter(p => d.perg[p.k]).map(p => p.auto
+    ? row(p.auto, `${p.pv} PV ciascuna · contate dalla sezione qui sopra`, `<b class="auto">${r.cnt[p.k]}</b>`, r.pergPts[p.k])
+    : row(p.ask, `${p.pv} PV ciascuna`, stepper("counts." + (p.k === "ninfea" ? "ninfee" : p.k), r.cnt[p.k], 0, 30), r.pergPts[p.k])).join("");
+
+  $("#objPick").innerHTML = OBJ.map(x =>
+    `<button class="${o[x.k].on ? "on" : ""}" data-act="toggle" data-path="obj.${x.k}.on" aria-pressed="${o[x.k].on}"><img src="img/card-${x.k}.jpg" alt=""><span>${x.name}</span></button>`).join("");
+  const op = r.objPts;
+  const info = {
+    centenaria:["Vale 8 PV e si conta come una normale carpa: +1 PV per ogni Ninfea adiacente, valore doppio se circondata dall'acqua.", carpCtl("obj.centenaria", o.centenaria, viola)],
+    cascata:["8 PV, oppure 16 PV se la tessera Sorgente è completamente occupata.", toggle("obj.cascata.full", o.cascata.full, "Sorgente completamente occupata")],
+    viola:["Non dà punti da sola: ogni carpa adiacente guadagna 2 PV. Indica le ninfee viola adiacenti su ciascuna carpa nella sezione Carpe.", ""],
+    percorso:["3 / 6 / 12 / 18 PV con 1 / 2 / 3 / 4 o più tessere Percorso.", mini(stepper("obj.percorso.n", o.percorso.n, 1, 7), "tessere Percorso")],
+    ponticello:["1 PV per ogni esagono (libero o occupato) in linea retta davanti ai tre esagoni del Ponticello.", mini(stepper("obj.ponticello.n", o.ponticello.n, 0, 60), "esagoni in linea")],
+    rami:["Tocca tutti i rami che hai ottenuto: piccolo 10 PV, medio 15 PV, grande 20 PV.", `<div class="seg">${toggle("obj.rami.s", o.rami.s, "Piccolo · 10")}${toggle("obj.rami.m", o.rami.m, "Medio · 15")}${toggle("obj.rami.l", o.rami.l, "Grande · 20")}</div>`],
+    salice:["8 PV.", ""],
+    shishi:["3 PV per ogni carpa adiacente a una delle 3 tessere Acqua che ospitano lo Shishi odoshi.", mini(stepper("obj.shishi.n", o.shishi.n, 0, 12), "carpe adiacenti")],
+    statua:["4 PV per ogni carpa presente (anche parzialmente) in linea retta di fronte alla Statua.", mini(stepper("obj.statua.n", o.statua.n, 0, 12), "carpe in linea")],
+    tartaruga:["1 / 2 / 4 / 8 / 12 / 16 PV con 1–6 tessere Acqua libere adiacenti alla Tartaruga.", mini(stepper("obj.tartaruga.n", o.tartaruga.n, 0, 6), "tessere Acqua libere adiacenti")],
+  };
+  $("#objList").innerHTML = OBJ.filter(x => o[x.k].on).map(x =>
+    `<div class="obj"><div class="obj-head">${ico("tile-" + x.k, "big")}<b>${x.name}</b>${x.k === "viola" ? "" : pts(op[x.k])}</div><small>${info[x.k][0]}</small>${info[x.k][1]}</div>`).join("");
+
+  $("#miscList").innerHTML =
+      row("Segnalini Fortuna avanzati", "1 PV ciascuno", stepper("fortuna", d.fortuna, 0, 12), d.fortuna, ico("fortuna", "big"))
+    + row("Monete rimaste", "non danno punti: servono solo in caso di parità", stepper("coins", d.coins, 0, 30), undefined, ico("moneta", "big"));
+
+  $("#photoPrev").innerHTML = d.photoId ? `<div class="photo-prev"><img data-photo="${d.photoId}" alt="Foto del laghetto"><button class="xbtn" data-act="photo-del" aria-label="Rimuovi foto">×</button></div>` : "";
+  hydratePhotos($("#photoPrev"));
+
+  $("#sumList").innerHTML = PARTS.map(([t, k]) => `<li><span>${t}</span><b>${r.parts[k]} PV</b></li>`).join("");
+  $("#hankoTotal").textContent = r.total;
+  $("#chipTotal").textContent = r.total;
+
+  const solo = soloResult(d, r);
+  $("#soloBox").innerHTML = !solo ? "" : `<div class="solo-box">${
+      d.scenario === "imperiale" ? ""
+        : row(d.scenario === "sentiero" ? "Tutti gli obiettivi reclamati e sentiero Lanterna–Statua completato" : "Tutti gli obiettivi in gioco reclamati almeno una volta", "", toggle("soloReq", d.soloReq, "Sì"))
+    }<div class="solo-title ${solo.ok ? "" : "fail"}">${solo.ok ? "Titolo: " : ""}${solo.text}</div></div>`;
+
+  const editing = d.editId && findScore(d.editId);
+  $("#editBanner").classList.toggle("hidden", !editing);
+  $("#editText").textContent = editing ? "Stai modificando il punteggio del " + fmtDate(editing.ts) : "";
+  $("#saveBtn").textContent = editing ? "Salva modifiche" : "Invia punteggio";
+  persist();
+}
+
+/* ---------- Azioni sul punteggio ---------- */
+function getPath(path){
+  const keys = path.split("."), last = keys.pop();
+  return [keys.reduce((o, k) => o[k], state.draft), last];
+}
+function saveScore(){
+  const d = state.draft;
+  if(!state.profile){ openProfile(); return; }
+  const r = compute(d), solo = soloResult(d, r), now = Date.now();
+  const prev = d.editId && findScore(d.editId);
+  const data = clone(d);
+  delete data.editId; delete data.photoId;
+  // Data e ora sono quelle dell'invio; una modifica successiva non sposta il punteggio in un'altra partita.
+  const score = {
+    id:prev ? prev.id : uid(), userId:prev ? prev.userId : state.profile.id, player:prev ? prev.player : state.profile.name,
+    ts:prev ? prev.ts : now, updated:now, mode:modeOf(d), total:r.total, parts:r.parts, coins:d.coins,
+    title:solo ? solo.text : "", photoId:d.photoId, data, dirty:true,
+    photoPending:!!d.photoId && (!prev || prev.photoId !== d.photoId || !!prev.photoPending),
+  };
+  if(prev){
+    if(prev.photoId && prev.photoId !== d.photoId) photoDelete(prev.photoId);
+    state.scores[state.scores.indexOf(prev)] = score;
+  }else state.scores.push(score);
+  state.draft = newDraft(d);
+  render(); renderMatches(); showTab("matches");
+  toast((prev ? "Punteggio aggiornato: " : "Punteggio inviato: ") + r.total + " PV");
+  sync();
+}
+function resetDraft(){
+  dropDraftPhoto();
+  state.draft = newDraft(state.draft);
+  render();
+}
+function editScore(id){
+  const s = findScore(id);
+  if(!s) return;
+  dropDraftPhoto();
+  state.draft = upgradeDraft(Object.assign(newDraft(), clone(s.data || {}), {editId:id, photoId:s.photoId || ""}));
+  render(); showTab("calc");
+}
+function deleteScore(id){
+  const s = findScore(id);
+  if(!s || !confirm("Eliminare questo punteggio?")) return;
+  if(state.draft.editId === id) resetDraft();
+  photoDelete(s.photoId);
+  // Con la sincronizzazione attiva resta una lapide, così l'eliminazione arriva anche agli altri telefoni.
+  if(canSync()) state.scores[state.scores.indexOf(s)] = {id:s.id, userId:s.userId, ts:s.ts, updated:Date.now(), deleted:true, dirty:true};
+  else state.scores.splice(state.scores.indexOf(s), 1);
+  persist(); renderMatches(); sync();
+}
+
+/* ---------- Profilo ---------- */
+function renderProfile(){
+  $("#profileBtn").textContent = state.profile ? state.profile.name : "Crea profilo";
+}
+function openProfile(){
+  const first = !state.profile, mustFill = first || (!!SYNC_URL && !state.profile.group);
+  let ov = $("#profileOv");
+  if(!ov){ ov = document.createElement("div"); ov.id = "profileOv"; ov.className = "overlay profile"; document.body.appendChild(ov); }
+  ov.innerHTML = `<form class="profile-card" id="profileForm">
+      <div class="seal big">鯉</div>
+      <h2>${first ? "Benvenuto al laghetto" : "Il tuo profilo"}</h2>
+      <p class="hint">${first ? "Scegli il nome con cui compariranno i tuoi punteggi. Verrà ricordato su questo telefono." : "Cambia il nome con cui compaiono i tuoi punteggi."}</p>
+      <div class="field"><label for="profileName">Il tuo nome</label><input type="text" id="profileName" maxlength="24" autocomplete="nickname" value="${first ? "" : esc(state.profile.name)}" required></div>
+      ${SYNC_URL ? `<div class="field" style="margin-top:12px;"><label for="profileGroup">Codice del gruppo</label><input type="text" id="profileGroup" minlength="6" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false" value="${first ? "" : esc(state.profile.group || "")}" required>
+        <small class="hint" style="display:block; margin:6px 0 0;">Lo stesso per tutti gli amici, almeno 6 caratteri. Chi non lo conosce non può vedere le vostre partite.</small></div>` : ""}
+      <div class="btns" style="justify-content:${mustFill ? "center" : "space-between"}; margin-top:16px;">
+        ${mustFill ? "" : `<button type="button" class="btn" data-act="profile-close">Annulla</button>`}
+        <button class="btn primary">${first ? "Entra" : "Salva"}</button>
+      </div>
+    </form>`;
+  $("#profileForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("#profileName").value.trim();
+    const group = SYNC_URL ? groupCode($("#profileGroup").value) : "";
+    if(!name) return;
+    if(SYNC_URL && group.length < 6){ toast("Il codice del gruppo deve avere almeno 6 caratteri"); return; }
+    if(first) state.profile = {id:uid(), name, group};
+    else{
+      const moved = group !== (state.profile.group || "");
+      state.profile.name = name; state.profile.group = group;
+      // Cambio di gruppo: i punteggi degli altri restano nel vecchio gruppo, i miei vengono ricaricati nel nuovo.
+      if(moved) state.scores = state.scores.filter(s => isMine(s) && !s.deleted);
+      state.scores.filter(s => isMine(s) && !s.deleted).forEach(s => { s.player = name; s.updated = Date.now(); s.dirty = true; if(moved) s.photoPending = !!s.photoId; });
+    }
+    ov.remove(); persist(); renderProfile(); renderMatches(); sync();
+  });
+  $("#profileName").focus();
+}
+
+/* ---------- Render: partite ---------- */
+function fmtDate(v){
+  const d = new Date(v);
+  return d.toLocaleDateString("it-IT", {weekday:"short", day:"numeric", month:"long", year:"numeric"}) + " · " + d.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"});
+}
+// Le partite non sono salvate: si ricavano raggruppando i punteggi per orario di invio.
+function buildMatches(){
+  const matches = [];
+  for(const s of state.scores.filter(x => !x.deleted).sort((a, b) => a.ts - b.ts)){
+    let m = null;
+    if(s.mode === "multi"){
+      for(let i = matches.length - 1; i >= 0 && !m; i--){
+        const c = matches[i];
+        if(s.ts - c.last > MERGE_WINDOW) break;
+        if(c.multi && !c.scores.some(x => x.userId === s.userId)) m = c;
+      }
+    }
+    if(!m){ m = {multi:s.mode === "multi", first:s.ts, scores:[]}; matches.push(m); }
+    m.scores.push(s); m.last = s.ts;
+  }
+  return matches.reverse();
+}
+function renderSync(){
+  const sb = $("#syncBox");
+  sb.className = "sync " + syncState;
+  sb.innerHTML = syncState === "off" ? "I punteggi sono salvati solo su questo dispositivo."
+    : !canSync() ? `Per condividere le partite <button class="linkish" data-act="profile">inserisci il codice del gruppo</button>.`
+    : (syncState === "err" ? "Sincronizzazione non riuscita: riproverò tra poco."
+       : syncedAt ? "Sincronizzato con gli amici alle " + new Date(syncedAt).toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"}) : "Sincronizzazione in corso…")
+      + ` <button class="linkish" data-act="sync">Aggiorna</button>`;
+}
+function renderMatches(){
+  renderSync();
+  const el = $("#matchList"), matches = buildMatches();
+  if(!matches.length){
+    el.innerHTML = `<div class="card has-ribbon"><span class="ribbon">Partite</span><p class="empty">Nessuna partita.<br>Calcola un punteggio e invialo: comparirà qui con data e ora.</p></div>`;
+    return;
+  }
+  el.innerHTML = matches.map(m => {
+    // In caso di parità vince chi ha più monete.
+    const ranked = [...m.scores].sort((a, b) => b.total - a.total || b.coins - a.coins), top = ranked[0], second = ranked[1];
+    const tie = second && second.total === top.total && second.coins === top.coins;
+    const winner = !second ? "" : `<div class="winner"><span class="kachi">勝</span><div>${tie
+        ? `<small>Parità</small><b>${ranked.filter(s => s.total === top.total && s.coins === top.coins).map(s => esc(s.player)).join(" e ")}</b>`
+        : `<small>Vincitore${second.total === top.total ? " per numero di monete" : ""}</small><b>${esc(top.player)}</b>`}</div><span class="tot">${top.total}</span></div>`;
+    const waiting = m.multi && !second && Date.now() - m.last < MERGE_WINDOW
+      ? `<p class="hint" style="margin:8px 0 0;">I punteggi inviati dagli altri giocatori entro 15 minuti verranno uniti a questa partita.</p>` : "";
+    return `<div class="card has-ribbon">
+      <span class="ribbon">${m.multi ? "Partita" : "Solitario"}</span>
+      <div class="match-head"><h3>${esc(fmtDate(m.first))}</h3><span class="chip">${m.scores.length} ${m.scores.length === 1 ? "giocatore" : "giocatori"}</span></div>
+      ${winner}
+      ${ranked.map((s, i) => `
+        <details class="score ${second && !tie && i === 0 ? "win" : ""}">
+          <summary>
+            <span class="rank">${i + 1}</span>
+            <span class="who">${esc(s.player)}<small>${MODES[s.mode].name}${s.title ? " · " + esc(s.title) : ""} · ${s.coins} monete</small></span>
+            ${s.photoId ? `<img class="thumb" data-photo="${s.photoId}" alt="">` : ""}
+            <span class="tot">${s.total}</span>
+            ${isMine(s) ? `<button class="pen" data-act="edit-score" data-id="${s.id}" aria-label="Modifica il tuo punteggio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.500 4.500a2.100 2.100 0 013 3L8 19l-4 1zM14.500 6.500l3 3"/></svg></button>` : ""}
+          </summary>
+          <div class="detail">
+            <ul class="sumlist">${PARTS.map(([t, k]) => `<li><span>${t}</span><b>${(s.parts && s.parts[k]) || 0} PV</b></li>`).join("")}</ul>
+            ${s.photoId ? `<img data-photo="${s.photoId}" data-act="photo-view" alt="Foto del laghetto di ${esc(s.player)}">` : ""}
+            ${isMine(s) ? `<div class="btns" style="margin-top:10px;"><button class="btn small" data-act="edit-score" data-id="${s.id}">Modifica</button><button class="btn small danger" data-act="del-score" data-id="${s.id}">Elimina</button></div>` : ""}
+          </div>
+        </details>`).join("")}
+      ${waiting}
+    </div>`;
+  }).join("");
+  hydratePhotos(el);
+}
+
+/* ---------- Libro del regolamento ---------- */
+const TOC = [["Copertina",1],["Contenuto",2],["Preparazione",4],["Il gioco",6],["Le carte",8],["Piazzamento",9],["Fine partita e punteggio",11],["Esempio di punteggio",12],["Gli obiettivi",13],["Solitario",14],["Storia delle Koi",15]];
+const book = {pages:16, cur:0, spread:false, P:0, leaves:[], built:false};
+const pad = n => String(n).padStart(2, "0");
+const bookMax = () => book.spread ? book.pages / 2 : book.pages - 1;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function layoutBook(){
+  const desk = $("#desk"), w = desk.clientWidth - 16;
+  if(w <= 0) return;                                   // pannello nascosto
+  const h = Math.max(240, window.innerHeight - 290);
+  const spread = w >= 720;
+  const P = Math.floor(spread ? Math.min(w / 2 - 14, h) : Math.min(w, h));
+  if(book.built && spread !== book.spread){            // converti la posizione tra pagina singola e doppia
+    const page = book.spread ? Math.max(1, book.cur * 2) : book.cur + 1;
+    book.cur = spread ? Math.floor(page / 2) : page - 1;
+    book.built = false;
+  }
+  book.spread = spread; book.P = P;
+  const el = $("#book");
+  el.style.width = (spread ? 2 * P : P) + "px"; el.style.height = P + "px";
+  if(!book.built) buildBook();
+  book.leaves.forEach((l, i) => { l.el.style.width = l.el.style.height = P + "px"; l.el.style.left = (spread ? P : 0) + "px"; applyLeaf(i); });
+  updateBook();
+}
+function buildBook(){
+  const el = $("#book"), n = book.spread ? book.pages / 2 : book.pages;
+  const img = p => `<img data-src="rules/p${pad(p)}.jpg" alt="Regolamento, pagina ${p}" draggable="false">`;
+  el.innerHTML = `<i class="edge" id="edgeL"></i><i class="edge" id="edgeR"></i>`;
+  book.leaves = [];
+  for(let i = 0; i < n; i++){
+    const leaf = document.createElement("div");
+    leaf.className = "leaf";
+    leaf.innerHTML = `<div class="face front">${img(book.spread ? 2 * i + 1 : i + 1)}<i class="shade"></i></div><div class="face back">${book.spread ? img(2 * i + 2) : ""}<i class="shade"></i></div>`;
+    el.appendChild(leaf);
+    book.leaves.push({el:leaf, angle:i < book.cur ? 180 : 0, raf:0});
+  }
+  book.built = true;
+  $("#bookHint").textContent = book.spread ? "Trascina o clicca una pagina per sfogliare. Usa anche le frecce della tastiera."
+                                           : "Scorri col dito per sfogliare. Tocca il centro della pagina per ingrandirla.";
+}
+function applyLeaf(i, moving){
+  const l = book.leaves[i], right = l.angle < 90;
+  l.el.style.transform = `rotateY(${-l.angle}deg)`;
+  l.el.style.zIndex = (moving ? 300 : 0) + (right ? 100 - i : i + 1);
+  l.el.style.setProperty("--sh", (Math.sin(l.angle * Math.PI / 180) * .35).toFixed(3));
+  // A pagina singola i fogli girati finiscono fuori dal libro: nascondili a fine corsa.
+  l.el.style.visibility = !book.spread && l.angle >= 180 ? "hidden" : "visible";
+}
+function animateLeaf(i, to){
+  const l = book.leaves[i], from = l.angle, t0 = performance.now();
+  const dur = reduceMotion ? 0 : Math.max(160, Math.abs(to - from) / 180 * 750);
+  cancelAnimationFrame(l.raf);
+  const step = t => {
+    const k = dur ? Math.min(1, (t - t0) / dur) : 1;
+    const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    l.angle = from + (to - from) * e;
+    applyLeaf(i, k < 1);
+    if(k < 1) l.raf = requestAnimationFrame(step);
+  };
+  l.raf = requestAnimationFrame(step);
+}
+function updateBook(){
+  const n = book.leaves.length, c = book.cur, P = book.P;
+  // Libro chiuso: centra la copertina.
+  $("#book").style.transform = !book.spread ? "" : c === 0 ? `translateX(${-P / 2}px)` : c === n ? `translateX(${P / 2}px)` : "";
+  const eL = $("#edgeL"), eR = $("#edgeR");
+  eL.style.display = eR.style.display = book.spread ? "" : "none";
+  if(book.spread){
+    const wl = Math.max(0, c - 1) * 2, wr = Math.max(0, n - c - 1) * 2;
+    eL.style.width = wl + "px"; eL.style.left = (c ? -wl : P) + "px";
+    eR.style.width = wr + "px"; eR.style.left = (c < n ? 2 * P : P - wr) + "px";
+  }
+  $("#bookPos").textContent = !book.spread ? `Pagina ${c + 1} / ${book.pages}`
+    : c === 0 ? "Copertina" : c === n ? "Retro" : `Pagine ${2 * c}–${2 * c + 1} / ${book.pages}`;
+  $("#bookPrev").disabled = c <= 0;
+  $("#bookNext").disabled = c >= bookMax();
+  book.leaves.forEach((l, i) => {
+    if(i < c - 3 || i > c + 2) return;
+    l.el.querySelectorAll("img[data-src]").forEach(im => { im.src = im.dataset.src; im.removeAttribute("data-src"); });
+  });
+}
+function flip(dir){
+  if(dir > 0 && book.cur < bookMax()){ animateLeaf(book.cur, 180); book.cur++; }
+  else if(dir < 0 && book.cur > 0){ book.cur--; animateLeaf(book.cur, 0); }
+  updateBook();
+}
+function goToPage(p){
+  book.cur = Math.min(bookMax(), book.spread ? Math.floor(p / 2) : p - 1);
+  book.leaves.forEach((l, i) => { cancelAnimationFrame(l.raf); l.angle = i < book.cur ? 180 : 0; applyLeaf(i); });
+  updateBook();
+}
+const currentPage = () => book.spread ? Math.min(book.pages, Math.max(1, book.cur * 2)) : book.cur + 1;
+
+// Trascinamento: la pagina segue il dito, poi completa o torna indietro.
+let drag = null;
+function bookDown(e){
+  if(e.button) return;
+  const r = $("#book").getBoundingClientRect();
+  drag = {x:e.clientX, y:e.clientY, rx:(e.clientX - r.left) / r.width, moved:false, leaf:-1, dir:0, prog:0};
+}
+function bookMove(e){
+  if(!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if(!drag.moved){
+    if(Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+    drag.moved = true; drag.dir = dx < 0 ? 1 : -1;
+    if(drag.dir > 0 && book.cur < bookMax()) drag.leaf = book.cur;
+    if(drag.dir < 0 && book.cur > 0) drag.leaf = book.cur - 1;
+    try{ $("#book").setPointerCapture(e.pointerId); }catch(err){}
+    if(drag.leaf >= 0) cancelAnimationFrame(book.leaves[drag.leaf].raf);
+  }
+  if(drag.leaf < 0) return;
+  drag.prog = Math.min(1, Math.max(0, -dx * drag.dir / (book.P * (book.spread ? 1.3 : .85))));
+  book.leaves[drag.leaf].angle = drag.dir > 0 ? drag.prog * 180 : 180 - drag.prog * 180;
+  applyLeaf(drag.leaf, true);
+}
+function bookUp(e){
+  if(!drag) return;
+  const g = drag; drag = null;
+  if(!g.moved){
+    if(e.type === "pointercancel") return;
+    if(book.spread) flip(g.rx > .5 ? 1 : -1);
+    else if(g.rx < .28) flip(-1);
+    else if(g.rx > .72) flip(1);
+    else openZoom(book.cur + 1);
+    return;
+  }
+  if(g.leaf < 0) return;
+  const done = g.prog > .22 && e.type !== "pointercancel";
+  if(done) book.cur += g.dir;
+  animateLeaf(g.leaf, (g.dir > 0) === done ? 180 : 0);
+  updateBook();
+}
+
+/* ---------- Overlay: zoom delle pagine e foto ---------- */
+let zoom = null;
+function openZoom(page){ zoom = {page, scale:0}; drawZoom(); }
+function openPhoto(src){ zoom = {src, scale:0}; drawZoom(); }
+function drawZoom(){
+  let ov = $("#overlay");
+  if(!ov){ ov = document.createElement("div"); ov.id = "overlay"; ov.className = "overlay"; document.body.appendChild(ov); }
+  const isPage = !!zoom.page;
+  if(!zoom.scale) zoom.scale = isPage ? Math.max(1, Math.min(2.5, 900 / window.innerWidth)) : 1;
+  ov.innerHTML = `<div class="ov-bar">
+      <div class="btns">${isPage ? `<button class="btn" data-act="zoom-page" data-d="-1" ${zoom.page <= 1 ? "disabled" : ""} aria-label="Pagina precedente">‹</button><button class="btn" data-act="zoom-page" data-d="1" ${zoom.page >= book.pages ? "disabled" : ""} aria-label="Pagina successiva">›</button>` : ""}</div>
+      <span>${isPage ? `Pagina ${zoom.page} / ${book.pages}` : "Foto del laghetto"}</span>
+      <div class="btns"><button class="btn" data-act="zoom-scale" data-d="-0.5" aria-label="Rimpicciolisci">−</button><button class="btn" data-act="zoom-scale" data-d="0.5" aria-label="Ingrandisci">+</button><button class="btn" data-act="zoom-close" aria-label="Chiudi">×</button></div>
+    </div>
+    <div class="ov-scroll"><img src="${isPage ? `rules/p${pad(zoom.page)}.jpg` : zoom.src}" alt="" style="width:${Math.round(zoom.scale * 100)}%"></div>`;
+}
+function closeZoom(){
+  const ov = $("#overlay");
+  if(ov) ov.remove();
+  if(zoom && zoom.page && currentPage() !== zoom.page && !(book.spread && Math.floor(zoom.page / 2) === book.cur)) goToPage(zoom.page);
+  zoom = null;
+}
+
+/* ---------- Navigazione ed eventi ---------- */
+function showTab(tab){
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + tab));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $("#totalChip").classList.toggle("hidden", tab !== "calc");
+  if(tab === "rules") layoutBook();
+  if(tab === "matches") sync();
+  window.scrollTo(0, 0);
+}
+let toastTimer;
+function toast(msg){
+  let t = $("#toast");
+  if(!t){ t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hidden"), 2600);
+}
+
+document.addEventListener("click", e => {
+  const tab = e.target.closest(".tab-btn");
+  if(tab){ showTab(tab.dataset.tab); return; }
+  const toc = e.target.closest("[data-toc]");
+  if(toc){ goToPage(+toc.dataset.toc); $("#desk").scrollIntoView({behavior:"smooth", block:"start"}); return; }
+  const el = e.target.closest("[data-act]");
+  if(!el) return;
+  const a = el.dataset.act, d = state.draft;
+  if(a === "step"){
+    const [o, k] = getPath(el.dataset.path);
+    o[k] = Math.min(+el.dataset.max, Math.max(+el.dataset.min, o[k] + (+el.dataset.d)));
+    render();
+  }else if(a === "toggle"){
+    const [o, k] = getPath(el.dataset.path); o[k] = !o[k]; render();
+  }else if(a === "set"){
+    const [o, k] = getPath(el.dataset.path), v = el.dataset.val;
+    o[k] = isNaN(v) ? v : +v; render();
+  }else if(a === "solo"){
+    d.solo = el.dataset.val === "1"; render();
+  }else if(a === "del"){
+    d[el.dataset.path].splice(+el.dataset.i, 1); render();
+  }else if(a === "add-carp"){
+    d.carps.push({size:el.dataset.size, ninfee:0, viola:0, surrounded:false}); render();
+  }else if(a === "add-lantern"){
+    d.lanterns.push(0); render();
+  }else if(a === "photo-del"){
+    dropDraftPhoto(); render();
+  }else if(a === "save"){
+    saveScore();
+  }else if(a === "reset"){
+    if(confirm("Azzerare tutti i valori inseriti?")) resetDraft();
+  }else if(a === "cancel-edit"){
+    resetDraft();
+  }else if(a === "rules"){
+    showTab("rules"); goToPage(+el.dataset.page);
+  }else if(a === "edit-score"){
+    e.preventDefault();               // la pennina sta dentro <summary>: non deve aprire il dettaglio
+    editScore(el.dataset.id);
+  }else if(a === "del-score"){
+    deleteScore(el.dataset.id);
+  }else if(a === "sync"){
+    sync();
+  }else if(a === "profile"){
+    openProfile();
+  }else if(a === "profile-close"){
+    $("#profileOv").remove();
+  }else if(a === "photo-view"){
+    openPhoto(el.src);
+  }else if(a === "book-prev"){ flip(-1);
+  }else if(a === "book-next"){ flip(1);
+  }else if(a === "book-zoom"){ openZoom(currentPage());
+  }else if(a === "zoom-page"){ zoom.page += +el.dataset.d; drawZoom();
+  }else if(a === "zoom-scale"){ zoom.scale = Math.min(4, Math.max(.5, zoom.scale + (+el.dataset.d))); drawZoom();
+  }else if(a === "zoom-close"){ closeZoom(); }
+});
+
+$("#photoCam").addEventListener("change", onPhoto);
+$("#photoFile").addEventListener("change", onPhoto);
+const bookEl = $("#book");
+bookEl.addEventListener("pointerdown", bookDown);
+bookEl.addEventListener("pointermove", bookMove);
+bookEl.addEventListener("pointerup", bookUp);
+bookEl.addEventListener("pointercancel", bookUp);
+document.addEventListener("keydown", e => {
+  if(zoom){
+    if(e.key === "Escape") closeZoom();
+    return;
+  }
+  if(!$("#panel-rules").classList.contains("active")) return;
+  if(e.key === "ArrowRight") flip(1);
+  if(e.key === "ArrowLeft") flip(-1);
+});
+window.addEventListener("resize", () => { if($("#panel-rules").classList.contains("active")) layoutBook(); });
+// Il pinch sul trackpad arriva come rotella + Ctrl: ingrandirebbe la pagina spingendo fuori schermo la barra in basso.
+window.addEventListener("wheel", e => { if(e.ctrlKey) e.preventDefault(); }, {passive:false});
+// Tieni aggiornate le partite degli amici mentre l'app è aperta.
+window.addEventListener("online", sync);
+document.addEventListener("visibilitychange", () => { if(!document.hidden) sync(); });
+setInterval(() => { if(!document.hidden) sync(); }, 20000);
+
+$("#toc").innerHTML = TOC.map(([t, p]) => `<button data-toc="${p}">${t}<small>p. ${p}</small></button>`).join("");
+renderProfile(); render(); renderMatches(); sync();
+if(!state.profile || (SYNC_URL && !state.profile.group)) openProfile();
+</script>
+</body>
+</html>
