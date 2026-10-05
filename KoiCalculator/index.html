@@ -262,6 +262,14 @@ input[type=file]{position:absolute; width:1px; height:1px; opacity:0; pointer-ev
 .pen{border:1px solid var(--line); background:#fff; width:36px; height:36px; border-radius:50%; display:grid; place-items:center; color:var(--ai); flex:none;}
 .pen svg{width:17px; height:17px;}
 .pen:hover{background:var(--mizu);}
+
+/* ---------- Badge "Powered by Netlify" ---------- */
+/* Netlify lo fissa in basso a destra: sui telefoni coprirebbe la scheda Regolamento, quindi la barra gli lascia una riga sotto. */
+@media(max-width:720px){
+  body.has-badge{padding-bottom:calc(126px + env(safe-area-inset-bottom));}
+  body.has-badge .tabbar{padding-bottom:calc(56px + env(safe-area-inset-bottom));}
+  body.has-badge .toast{bottom:calc(140px + env(safe-area-inset-bottom));}
+}
 </style>
 </head>
 <body>
@@ -1124,6 +1132,10 @@ document.addEventListener("keydown", e => {
 window.addEventListener("resize", () => { if($("#panel-rules").classList.contains("active")) layoutBook(); });
 // Il pinch sul trackpad arriva come rotella + Ctrl: ingrandirebbe la pagina spingendo fuori schermo la barra in basso.
 window.addEventListener("wheel", e => { if(e.ctrlKey) e.preventDefault(); }, {passive:false});
+// Il badge di Netlify viene aggiunto alla pagina dopo il caricamento: quando compare, la barra in basso si alza.
+const badgeCheck = () => document.body.classList.toggle("has-badge", !!document.getElementById("nl-badge-frame"));
+new MutationObserver(badgeCheck).observe(document.documentElement, {childList:true, subtree:true});
+badgeCheck();
 // Tieni aggiornate le partite degli amici mentre l'app è aperta.
 window.addEventListener("online", sync);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) sync(); });

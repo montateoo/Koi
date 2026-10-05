@@ -3,7 +3,7 @@ import sys, colorsys, math
 from collections import deque
 from PIL import Image, ImageFilter, ImageDraw
 src=Image.open(r"C:\Users\matte\Downloads\pic9661875.webp").convert("RGB")
-BOX={"s":(448,268,590,412),"m":(243,460,499,614),"l":(652,858,905,1088)}
+BOX={"s":(668,308,812,446),"m":(243,460,499,614),"l":(652,858,905,1088)}
 OUT=sys.argv[1] if len(sys.argv)>1 else "img"
 # Ogni carpa viene appoggiata sulla sua tessera: 1, 2 o 3 esagoni, per far capire la taglia a colpo d'occhio.
 R3=3**.5
