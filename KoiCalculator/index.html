@@ -270,6 +270,18 @@ input[type=file]{position:absolute; width:1px; height:1px; opacity:0; pointer-ev
   body.has-badge .tabbar{padding-bottom:calc(56px + env(safe-area-inset-bottom));}
   body.has-badge .toast{bottom:calc(140px + env(safe-area-inset-bottom));}
 }
+
+/* ---------- Laghetto vivo ---------- */
+.pondcv{display:block; width:100%; border-radius:12px; margin:10px 0; border:1px solid var(--line); box-shadow:0 4px 12px rgba(31,78,95,.18);}
+.ponded .ov-bar span{font-size:14px; font-weight:700;}
+.ponded canvas{display:block; margin:0 auto; touch-action:manipulation; cursor:crosshair;}
+.ed-pal{background:var(--paper); padding:8px 10px calc(8px + env(safe-area-inset-bottom)); display:grid; gap:6px;}
+.ed-pal:empty{display:none;}
+.ed-row{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;}
+.ed-row button{flex:none; border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; font-size:13px; font-weight:700; color:var(--ink-dim); display:inline-flex; align-items:center; gap:6px;}
+.ed-row button.on{background:var(--ai); border-color:var(--ai); color:#fff;}
+.ed-row i{width:13px; height:13px; border-radius:50%; border:1px solid rgba(0,0,0,.2);}
+.ed-count{font-size:12px; color:var(--ink-dim); align-self:center;}
 </style>
 </head>
 <body>
@@ -569,6 +581,7 @@ async function sync(){
         if(blob) await api("PUT", "photos/" + s.photoId, await blobToDataUrl(blob));
       }
       const rec = Object.assign({}, s, {data:JSON.stringify(s.data || {})});   // Firebase scarta array e oggetti vuoti
+      if(s.pond) rec.pond = JSON.stringify(s.pond);
       delete rec.dirty; delete rec.photoPending;
       await api("PUT", "scores/" + s.id, rec);
       s.dirty = false; s.photoPending = false;
@@ -577,6 +590,7 @@ async function sync(){
     for(const r of Object.values(remote)){
       if(!r || !r.id) continue;
       if(typeof r.data === "string"){ try{ r.data = JSON.parse(r.data); }catch(e){ r.data = {}; } }
+      if(typeof r.pond === "string"){ try{ r.pond = JSON.parse(r.pond); }catch(e){ delete r.pond; } }
       const i = state.scores.findIndex(s => s.id === r.id);
       if(i < 0) state.scores.push(r);
       else if(!state.scores[i].dirty && (r.updated || 0) > (state.scores[i].updated || 0)) state.scores[i] = r;
@@ -739,6 +753,8 @@ function saveScore(){
     title:solo ? solo.text : "", photoId:d.photoId, data, dirty:true,
     photoPending:!!d.photoId && (!prev || prev.photoId !== d.photoId || !!prev.photoPending),
   };
+  const samePhoto = prev && prev.photoId === d.photoId;
+  if(samePhoto && prev.pond) score.pond = prev.pond;
   if(prev){
     if(prev.photoId && prev.photoId !== d.photoId) photoDelete(prev.photoId);
     state.scores[state.scores.indexOf(prev)] = score;
@@ -873,14 +889,672 @@ function renderMatches(){
           <div class="detail">
             <ul class="sumlist">${PARTS.map(([t, k]) => `<li><span>${t}</span><b>${(s.parts && s.parts[k]) || 0} PV</b></li>`).join("")}</ul>
             ${s.photoId ? `<img data-photo="${s.photoId}" data-act="photo-view" alt="Foto del laghetto di ${esc(s.player)}">` : ""}
+            ${s.pond ? `<canvas class="pondcv" data-pond="${s.id}" role="img" aria-label="Laghetto animato di ${esc(s.player)}"></canvas>` : ""}
+            ${s.photoId ? `<div class="btns"><button class="btn small water" data-act="pond" data-id="${s.id}">${s.pond ? "Modifica il laghetto" : "Dai vita al laghetto"}</button></div>` : ""}
             ${isMine(s) ? `<div class="btns" style="margin-top:10px;"><button class="btn small" data-act="edit-score" data-id="${s.id}">Modifica</button><button class="btn small danger" data-act="del-score" data-id="${s.id}">Elimina</button></div>` : ""}
           </div>
         </details>`).join("")}
       ${waiting}
     </div>`;
   }).join("");
-  hydratePhotos(el);
+  hydratePhotos(el); pondKick();
 }
+
+/* ---------- Laghetto vivo: riconoscimento dalla foto ---------- */
+// Tutto avviene nel browser, senza servizi esterni: due tocchi sulla foto fissano la griglia esagonale,
+// poi ogni esagono viene classificato dai suoi colori. Il risultato si può correggere a mano prima di confermare.
+const POND_KINDS = [["water","Acqua","#5cc3c6"],["foliage","Foglie","#f2b62c"],["ninfea","Ninfea","#e86f9c"],["ninfea_viola","Ninfea viola","#8a5fd6"],
+                    ["shore","Sponda","#a9a59c"],["lantern","Lanterna","#ffd66e"],["path","Percorso","#d9d5cb"]];
+const POND_SIZES = [["small","Carpa piccola"],["medium","Carpa media"],["large","Carpa grande"],["centenaria","Centenaria"]];
+const POND_OBJECTS = [["cascata","Cascata"],["salice","Salice"],["ponticello","Ponticello"],["shishi","Shishi odoshi"],["statua","Statua"],["tartaruga","Tartaruga"],["rami","Rami"]];
+const NEIGH = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
+let ed = null;
+
+// L'acqua (A) è ciò che somiglia all'esagono toccato per primo; in mancanza del riferimento vale la tinta.
+// Classe di colore di un pixel: A acqua, B blu, P viola, M rosa, R rosso, O arancio, Y giallo, N verde, G grigio, W bianco, K nero, T marrone.
+function pxClass(r, g, b){
+  const w = ed && ed.ref;
+  if(w && Math.abs((r - g) - w[0]) < 11 && Math.abs((g - b) - w[1]) < 11 && Math.abs(r + g + b - w[2]) < 120) return "A";
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), v = mx / 255, s = mx ? (mx - mn) / mx : 0;
+  if(v < .22) return "K";
+  if(s < .11) return v > .82 ? "W" : "G";
+  let h = mx === r ? (g - b) / (mx - mn) : mx === g ? 2 + (b - r) / (mx - mn) : 4 + (r - g) / (mx - mn);
+  h = (h * 60 + 360) % 360;
+  if(h >= 12 && h < 50 && (v < .68 || s < .5)) return "T";    // marrone: legno del tavolo, terra
+  return h < 18 || h >= 345 ? "R" : h < 42 ? "O" : h < 68 ? "Y" : h < 150 ? "N" : h <= 205 ? "A" : h <= 250 ? "B" : h <= 295 ? "P" : "M";
+}
+function edHex(g, x, y, k){                 // esagono della griglia, anche quando la foto è inclinata
+  const a = ed.a, b = ed.b, V = [[a[0] + b[0], a[1] + b[1]], [2 * b[0] - a[0], 2 * b[1] - a[1]], [b[0] - 2 * a[0], b[1] - 2 * a[1]]];
+  for(let i = 0; i < 6; i++){ const v = V[i % 3], sg = (i < 3 ? 1 : -1) * k / 3; g[i ? "lineTo" : "moveTo"](x + v[0] * sg, y + v[1] * sg); }
+  g.closePath();
+}
+const edXY = (q, r) => [ed.o[0] + q * ed.a[0] + r * ed.b[0], ed.o[1] + q * ed.a[1] + r * ed.b[1]];
+function edCell(x, y){                      // punto dell'immagine -> esagono della griglia
+  const dx = x - ed.o[0], dy = y - ed.o[1], det = ed.a[0] * ed.b[1] - ed.a[1] * ed.b[0];
+  const q = (dx * ed.b[1] - dy * ed.b[0]) / det, r = (ed.a[0] * dy - ed.a[1] * dx) / det, z = -q - r;
+  let rq = Math.round(q), rr = Math.round(r); const rz = Math.round(z), dq = Math.abs(rq - q), dr = Math.abs(rr - r), dz = Math.abs(rz - z);
+  if(dq > dr && dq > dz) rq = -rr - rz; else if(dr > dz) rr = -rq - rz;
+  return [rq, rr];
+}
+function edSample(q, r){                    // frazione di pixel di ogni classe dentro l'esagono, più il baricentro del "pesce"
+  const [cx, cy] = edXY(q, r), rad = ed.d * .46, f = {A:0,B:0,P:0,M:0,R:0,O:0,Y:0,N:0,G:0,W:0,K:0,T:0};
+  let n = 0, fx = 0, fy = 0, fn = 0, tex = 0;
+  for(let y = Math.round(cy - rad); y <= cy + rad; y += 2) for(let x = Math.round(cx - rad); x <= cx + rad; x += 2){
+    if(x < 0 || y < 0 || x >= ed.aw || y >= ed.ah || (x - cx) ** 2 + (y - cy) ** 2 > rad * rad) continue;
+    const i = (y * ed.aw + x) * 4, c = pxClass(ed.px[i], ed.px[i + 1], ed.px[i + 2]);
+    f[c]++; n++;
+    if(x + 2 < ed.aw && y + 2 < ed.ah){ const j = i + 8, d2 = i + ed.aw * 8; tex += Math.abs(ed.px[i + 1] - ed.px[j + 1]) + Math.abs(ed.px[i + 1] - ed.px[d2 + 1]); }   // grana: stoffa e trame sono "ruvide", cartone e legno stampato lisci
+    const wgt = "ROYBK".includes(c) ? 1 : c === "W" ? .5 : 0;    // colori da carpa; il bianco vale metà perché può essere un riflesso
+    if(wgt){ fx += x * wgt; fy += y * wgt; fn += wgt; }
+  }
+  if(n < 12) return null;
+  for(const k in f) f[k] /= n;
+  return {f, tex:tex / n, fish:fn / n, fx:fn ? fx / fn : cx, fy:fn ? fy / fn : cy};
+}
+function edGuess(s){
+  const f = s.f, stone = f.G + f.W + f.T, warm = f.O + f.Y, vivid = f.R + f.O + f.Y + f.B + f.K + f.M + f.P;
+  if(f.N >= .12 && f.P + f.B >= .03 && f.P + f.B >= f.M + f.R) return "ninfea_viola";
+  if(f.N >= .12 && f.M + f.R >= .03) return "ninfea";
+  if(f.A >= .2 && s.fish >= .15 && f.R + f.O + f.Y + f.B + f.K >= .1) return "fish";
+  if(f.T + f.G >= .18 && f.A >= .15 && f.A < .75 && vivid < .08) return "shore";    // sassi con acqua accanto (il tavolo da solo non ha acqua)
+  if(f.N >= .25 && stone >= .08 && f.A >= .1 && f.A < .6) return "shore";           // sponda con più prato che sassi
+  if(f.A >= .4 && warm >= .025) return "foliage";
+  return f.A >= .4 ? "water" : "";
+}
+// I due tocchi non sono mai precisi: la griglia viene spostata, ruotata e scalata di poco finché i bordi
+// degli esagoni cadono sulle giunture tra le tessere (dove l'immagine cambia più bruscamente).
+function edRefine(){
+  const W = ed.aw, H = ed.ah, raw = new Float32Array(W * H), lum = new Float32Array(W * H), isA = new Uint8Array(W * H);
+  for(let i = 0; i < W * H; i++){ raw[i] = ed.px[i * 4] * .3 + ed.px[i * 4 + 1] * .59 + ed.px[i * 4 + 2] * .11; isA[i] = pxClass(ed.px[i * 4], ed.px[i * 4 + 1], ed.px[i * 4 + 2]) === "A" ? 1 : 0; }
+  for(let y = 1; y < H - 1; y++) for(let x = 1; x < W - 1; x++){ const i = y * W + x; lum[i] = (raw[i] * 2 + raw[i - 1] + raw[i + 1] + raw[i - W] + raw[i + W]) / 6; }
+  const aqua = (x, y) => { x = Math.round(x); y = Math.round(y); return x >= 0 && y >= 0 && x < W && y < H && isA[y * W + x] === 1; };
+  const L = (x, y) => lum[Math.round(y) * W + Math.round(x)];
+  // Punteggio: quota di punti lungo i bordi degli esagoni d'acqua in cui passa davvero una linea parallela al bordo
+  // (giuntura o cambio di tessera). Trame senza direzione, come sassi e squame, non votano.
+  const score = (ox, oy, ax, ay, bx, by) => {
+    const V = [[(ax + bx) / 3, (ay + by) / 3], [(2 * bx - ax) / 3, (2 * by - ay) / 3], [(bx - 2 * ax) / 3, (by - 2 * ay) / 3]];   // tre vertici; gli altri tre sono opposti
+    const vert = k => k < 3 ? V[k] : [-V[k - 3][0], -V[k - 3][1]], R = Math.hypot(ax, ay) / Math.sqrt(3), w = Math.max(2, R * .07);
+    let votes = 0, n = 0, cells = 0;
+    for(let q = -3; q <= 3; q++) for(let r = Math.max(-3, -q - 3); r <= Math.min(3, -q + 3); r++){
+      const cx = ox + q * ax + r * bx, cy = oy + q * ay + r * by;
+      if(!aqua(cx, cy) && !aqua(cx + R * .35, cy) && !aqua(cx - R * .35, cy)) continue;      // contano solo gli esagoni del laghetto
+      cells++;
+      for(let e = 0; e < 6; e++){
+        const p0 = vert(e), p1 = vert((e + 1) % 6), ex = p1[0] - p0[0], ey = p1[1] - p0[1], el = Math.hypot(ex, ey) || 1;
+        const tx = ex / el * w, ty = ey / el * w, nx = -ty, ny = tx;
+        for(let u = .2; u < .9; u += .15){
+          const x = cx + p0[0] + ex * u, y = cy + p0[1] + ey * u;
+          if(x < w + 2 || y < w + 2 || x > W - w - 3 || y > H - w - 3) continue;
+          const c = L(x, y), n1 = L(x + nx, y + ny), n2 = L(x - nx, y - ny), t1 = L(x + tx, y + ty), t2 = L(x - tx, y - ty);
+          const across = Math.max(Math.abs(n1 + n2 - 2 * c), Math.abs(n1 - n2)), along = Math.abs(t1 + t2 - 2 * c) + Math.abs(t1 - t2);
+          n++; if(across > 7 && across > 2 * along) votes++;
+        }
+      }
+    }
+    return cells < 4 ? 0 : votes / n;
+  };
+  ed.borders = (cx, cy) => {
+    const a = ed.a, b = ed.b, V = [[a[0] + b[0], a[1] + b[1]], [2 * b[0] - a[0], 2 * b[1] - a[1]], [b[0] - 2 * a[0], b[1] - 2 * a[1]]].map(v => [v[0] / 3, v[1] / 3]);
+    const vert = k => k < 3 ? V[k] : [-V[k - 3][0], -V[k - 3][1]], w = Math.max(2, ed.d * .04);
+    let found = 0;
+    for(let e = 0; e < 6; e++){
+      const p0 = vert(e), p1 = vert((e + 1) % 6), ex = p1[0] - p0[0], ey = p1[1] - p0[1], el = Math.hypot(ex, ey) || 1, tx = ex / el * w, ty = ey / el * w, nx = -ty, ny = tx;
+      let v = 0, n = 0;
+      for(let u = .15; u < .9; u += .1) for(const off of [-1, 0, 1]){                 // tollera un paio di pixel di scarto
+        const x = cx + p0[0] + ex * u + nx * off * .6, y = cy + p0[1] + ey * u + ny * off * .6;
+        if(x < w + 2 || y < w + 2 || x > W - w - 3 || y > H - w - 3) continue;
+        const c = L(x, y), n1 = L(x + nx, y + ny), n2 = L(x - nx, y - ny), t1 = L(x + tx, y + ty), t2 = L(x - tx, y - ty);
+        const across = Math.max(Math.abs(n1 + n2 - 2 * c), Math.abs(n1 - n2)), along = Math.abs(t1 + t2 - 2 * c) + Math.abs(t1 - t2);
+        n++; if(across > 7 && across > 1.6 * along) v++;
+      }
+      if(n && v / n >= .3) found++;
+    }
+    return found;
+  };
+  // Ricerca ampia (scala ±20%, rotazione ±15°, origine ovunque dentro un esagono)...
+  const d0 = ed.d, t0 = Math.atan2(ed.a[1], ed.a[0]);
+  let best = -1, p = null;
+  for(let ds = -.2; ds <= .201; ds += .025) for(let dt = -.27; dt <= .271; dt += .03){
+    const ax = d0 * (1 + ds) * Math.cos(t0 + dt), ay = d0 * (1 + ds) * Math.sin(t0 + dt), bx = ax * .5 - ay * .8660254, by = ax * .8660254 + ay * .5;
+    for(let u = -.5; u < .5; u += .125) for(let v = -.5; v < .5; v += .125){
+      const ox = ed.o[0] + u * ax + v * bx, oy = ed.o[1] + u * ay + v * by, sc = score(ox, oy, ax, ay, bx, by);
+      if(sc > best){ best = sc; p = [ox, oy, ax, ay, bx, by]; }
+    }
+  }
+  // ...poi rifinitura fine dei due assi separatamente: assorbe l'inclinazione di una foto non scattata dall'alto.
+  for(let step = d0 * .03; step > .25; step *= .6){
+    for(let moved = true, guard = 0; moved && guard < 8; guard++){
+      moved = false;
+      for(let i = 0; i < 6; i++) for(const sg of [-1, 1]){
+        const t = p.slice(); t[i] += sg * step * (i < 2 ? 1 : .3);
+        const v = score(t[0], t[1], t[2], t[3], t[4], t[5]); if(v > best){ best = v; p = t; moved = true; }
+      }
+    }
+  }
+  ed.o = [p[0], p[1]]; ed.a = [p[2], p[3]]; ed.b = [p[4], p[5]]; ed.d = (Math.hypot(p[2], p[3]) + Math.hypot(p[4], p[5])) / 2;
+}
+// Prima stesura automatica: parte dall'esagono toccato e si allarga finché trova acqua, poi aggiunge le sponde confinanti.
+function edDetect(){
+  ed.cells = new Map(); ed.carps = []; ed.objects = [];
+  const seen = new Map(), look = (q, r) => {
+    const k = q + "," + r;
+    if(!seen.has(k)){
+      const s = edSample(q, r);
+      if(s){ s.q = q; s.r = r; s.kind = edGuess(s); const [x, y] = edXY(q, r); if(s.kind && ed.borders(x, y) < 3) s.kind = ""; }   // una tessera vera ha giunture su più lati
+      seen.set(k, s);
+    }
+    return seen.get(k);
+  };
+  const wet = k => k && k !== "shore" && k !== "lantern", queue = [[0, 0]], fish = [];
+  ed.cells.set("0,0", wet(look(0, 0) && look(0, 0).kind) && look(0, 0).kind !== "fish" ? look(0, 0).kind : "water");
+  if(look(0, 0) && look(0, 0).kind === "fish") fish.push(look(0, 0));
+  while(queue.length && ed.cells.size < 400){
+    const [q, r] = queue.shift();
+    for(const [dq, dr] of NEIGH){
+      const k = (q + dq) + "," + (r + dr), s = look(q + dq, r + dr);
+      if(ed.cells.has(k) || !s || !s.kind) continue;
+      if(!wet(ed.cells.get(q + "," + r)) && wet(s.kind)) continue;   // dalle sponde si prosegue più sotto, con più cautela
+      if(wet(s.kind)){ ed.cells.set(k, s.kind === "fish" ? "water" : s.kind); queue.push([q + dq, r + dr]); if(s.kind === "fish") fish.push(s); }
+      else if(wet(ed.cells.get(q + "," + r))){ ed.cells.set(k, s.kind); queue.push([q + dq, r + dr]); }
+      continue;
+    }
+    if(wet(ed.cells.get(q + "," + r))) continue;
+    for(const [dq, dr] of NEIGH){                               // da una sponda: oltre c'è acqua vera solo se la tessera è netta su quasi tutti i lati
+      const k = (q + dq) + "," + (r + dr), s = look(q + dq, r + dr), [x, y] = edXY(q + dq, r + dr);
+      if(ed.cells.has(k) || !s || !wet(s.kind) || s.f.A < .6 || ed.borders(x, y) < 5) continue;
+      ed.cells.set(k, s.kind === "fish" ? "water" : s.kind); queue.push([q + dq, r + dr]); if(s.kind === "fish") fish.push(s);   // sponda: si aggiunge solo accanto all'acqua, e da lì si prosegue solo verso altra acqua
+    }
+  }
+  // Buchi: un esagono non riconosciuto ma circondato dal laghetto è una tessera coperta da un pezzo (ramo, statua, ponte).
+  // Sotto c'è acqua. Se la macchia che la copre è marrone pieno, è un ramo: lo si appoggia al centro.
+  const raw = (q, r) => { const k = q + "," + r; if(!seen.has(k)) look(q, r); return seen.get(k); }, holes = [];
+  for(let pass = 0; pass < 2; pass++) for(const k0 of [...ed.cells.keys()]){
+    const [q, r] = k0.split(",").map(Number);
+    for(const [dq, dr] of NEIGH){
+      const k = (q + dq) + "," + (r + dr);
+      if(ed.cells.has(k) || NEIGH.filter(([a, b]) => ed.cells.has((q + dq + a) + "," + (r + dr + b))).length < 4) continue;
+      ed.cells.set(k, "water"); const t = raw(q + dq, r + dr); if(t) holes.push(t);
+    }
+  }
+  const wood = holes.filter(t => t.f.T >= .5);
+  if(wood.length){
+    const c = wood.map(t => edXY(t.q, t.r));
+    ed.objects.push({x:sum(c.map(p => p[0])) / c.length, y:sum(c.map(p => p[1])) / c.length, kind:"rami"});
+  }
+  // Esagoni vicini fanno una sola carpa solo se hanno la stessa tinta dominante: due carpe diverse affiancate restano due.
+  const fam = t => { const w = t.f.O + t.f.Y, b = t.f.B, r = t.f.R + t.f.K; return w >= b && w >= r ? "w" : b >= r ? "b" : "r"; };
+  const left = new Set(fish.map(s => s.q + "," + s.r));
+  for(const s0 of fish){
+    if(!left.has(s0.q + "," + s0.r)) continue;
+    const group = [], stack = [s0]; left.delete(s0.q + "," + s0.r);
+    while(stack.length){ const s = stack.pop(); group.push(s); for(const [dq, dr] of NEIGH){ const k = (s.q + dq) + "," + (s.r + dr); if(left.has(k) && fam(seen.get(k)) === fam(s0)){ left.delete(k); stack.push(seen.get(k)); } } }
+    for(const s of group.slice()) for(const [dq, dr] of NEIGH){                        // esagoni vicini con solo la coda o una pinna
+      const k = (s.q + dq) + "," + (s.r + dr), t = seen.get(k);
+      if(t && !group.includes(t) && !left.has(k) && !fish.includes(t) && wet(ed.cells.get(k)) && t.f.A >= .3 && t.fish >= (t.kind === "foliage" ? .11 : .07) && fam(t) === fam(s0) && !t.kind.startsWith("ninfea")){ group.push(t); ed.cells.set(k, "water"); }   // poche macchie gialle restano foglie
+    }
+    const w = sum(group.map(s => s.fish)), tot = k => sum(group.map(s => s.f[k]));
+    const red = tot("R"), blk = tot("K"), blu = tot("B"), org = tot("O"), yel = tot("Y");
+    const color = blu > red && blu > org && blu > blk ? "blue" : org + yel > red + blk ? (yel > org ? "yellow" : "orange") : red > blk * 3 ? "red_white" : blk > red * 3 ? "black_white" : "red_black";
+    ed.carps.push({x:sum(group.map(s => s.fx * s.fish)) / w, y:sum(group.map(s => s.fy * s.fish)) / w, size:POND_SIZES[Math.max(1, Math.min(4, group.length, Math.round(w / .4))) - 1][0], color});   // taglia: quanta "carpa" c'è in tutto, non solo quanti esagoni tocca
+  }
+}
+async function openPondEditor(id){
+  const s = findScore(id);
+  if(!s || !s.photoId) return;
+  await photoUrl(s.photoId);                                  // se è la foto di un amico, la scarica e la mette in cache
+  const blob = await photoTx("readonly", st => st.get(s.photoId)).catch(() => null);
+  if(!blob){ toast("Foto non disponibile"); return; }
+  const bmp = await createImageBitmap(blob), k = Math.min(1, 900 / bmp.width);
+  const an = document.createElement("canvas"); an.width = Math.round(bmp.width * k); an.height = Math.round(bmp.height * k);
+  an.getContext("2d", {willReadFrequently:true}).drawImage(bmp, 0, 0, an.width, an.height);
+  ed = {id, img:an, aw:an.width, ah:an.height, px:an.getContext("2d").getImageData(0, 0, an.width, an.height).data,
+        step:0, o:null, a:null, b:null, d:0, cells:new Map(), carps:[], objects:[], brush:"water"};
+  const p = s.pond;
+  if(p && p.grid && p.cells.every(c => c.q !== undefined)){   // laghetto già ricostruito: si riapre per correggerlo
+    const g = p.grid, W = ed.aw, H = ed.ah;
+    Object.assign(ed, {step:2, o:[g.ox * W, g.oy * H], a:[g.ax * W, g.ay * H], b:[g.bx * W, g.by * H]});
+    ed.d = Math.hypot(ed.a[0], ed.a[1]);
+    p.cells.forEach(c => ed.cells.set(c.q + "," + c.r, c.kind));
+    ed.carps = (p.carps || []).map(c => ({x:c.x * W, y:c.y * H, size:c.size, color:c.color}));
+    ed.objects = (p.objects || []).map(c => ({x:c.x * W, y:c.y * H, kind:c.kind}));
+  }
+  const ov = document.createElement("div"); ov.id = "pondEd"; ov.className = "overlay ponded";
+  ov.innerHTML = `<div class="ov-bar"><span id="edMsg"></span><div class="btns"><button class="btn" data-act="ed-grid">Rifai griglia</button><button class="btn" data-act="ed-close" aria-label="Chiudi">×</button></div></div>
+    <div class="ov-scroll"><canvas id="edCv"></canvas></div><div class="ed-pal" id="edPal"></div>`;
+  document.body.appendChild(ov);
+  $("#edCv").addEventListener("click", edTap);
+  edRender();
+}
+function edRender(){
+  const cv = $("#edCv"), dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.min(window.innerWidth, 900), z = W / ed.aw, H = Math.round(ed.ah * z);
+  cv.style.width = W + "px"; cv.style.height = H + "px"; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const g = cv.getContext("2d"); g.setTransform(dpr * z, 0, 0, dpr * z, 0, 0);
+  g.drawImage(ed.img, 0, 0);
+  $("#edMsg").textContent = ["Tocca il centro di un esagono d'acqua", "Ora tocca il centro di un esagono confinante", "Controlla: scegli un elemento e tocca la foto per correggere"][ed.step];
+  if(ed.step < 2){
+    if(ed.o){ g.fillStyle = "#c73e2e"; g.strokeStyle = "#fff"; g.lineWidth = 2 / z; g.beginPath(); g.arc(ed.o[0], ed.o[1], 7 / z, 0, 7); g.fill(); g.stroke(); }
+  }else{
+    const R = ed.d / Math.sqrt(3), th = Math.atan2(ed.a[1], ed.a[0]), col = Object.fromEntries(POND_KINDS.map(k => [k[0], k[2]]));
+    g.fillStyle = "rgba(0,0,0,.18)"; g.fillRect(0, 0, ed.aw, ed.ah);
+    g.lineWidth = 2 / z; g.lineJoin = "round";
+    for(const [k, kind] of ed.cells){
+      const [q, r] = k.split(",").map(Number), [x, y] = edXY(q, r);
+      g.beginPath(); edHex(g, x, y, .96); g.globalAlpha = .42; g.fillStyle = col[kind]; g.fill(); g.globalAlpha = 1; g.strokeStyle = col[kind]; g.stroke();
+    }
+    for(const c of ed.carps){ const big = {small:.95, medium:1.5, large:2, centenaria:2.2}[c.size]; drawKoi(g, c.x, c.y, R * big, -.5, KOI_COLORS[c.color], 0, 3, c.size === "centenaria"); }
+    for(const ob of ed.objects){ g.save(); g.translate(ob.x, ob.y); g.lineJoin = "round"; POND_ART[ob.kind](g, R * .8, 0); g.restore(); }
+  }
+  const chip = (b, label, sw) => `<button class="${ed.brush === b ? "on" : ""}" data-act="ed-brush" data-b="${b}">${sw ? `<i style="background:${sw}"></i>` : ""}${label}</button>`;
+  $("#edPal").innerHTML = ed.step < 2 ? "" : `<div class="ed-row">${chip("erase", "Gomma")}${POND_KINDS.map(k => chip(k[0], k[1], k[2])).join("")}</div>
+    <div class="ed-row">${POND_SIZES.map(k => chip("carp:" + k[0], k[1])).join("")}${POND_OBJECTS.map(k => chip("obj:" + k[0], k[1])).join("")}</div>
+    <div class="btns" style="justify-content:space-between;"><span class="ed-count">${ed.cells.size} esagoni · ${ed.carps.length} carpe · ${ed.objects.length} obiettivi</span><button class="btn primary" data-act="ed-save">Dai vita al laghetto</button></div>`;
+}
+function edTap(e){
+  if(ed.busy) return;
+  const r = e.currentTarget.getBoundingClientRect(), z = r.width / ed.aw, x = (e.clientX - r.left) / z, y = (e.clientY - r.top) / z;
+  if(ed.step === 0){
+    ed.o = [x, y]; ed.step = 1;
+    const px = [];                                             // colore mediano dell'acqua attorno al punto toccato
+    for(let yy = Math.round(y) - 8; yy <= y + 8; yy += 2) for(let xx = Math.round(x) - 8; xx <= x + 8; xx += 2) if(xx >= 0 && yy >= 0 && xx < ed.aw && yy < ed.ah){ const i = (yy * ed.aw + xx) * 4; px.push([ed.px[i], ed.px[i + 1], ed.px[i + 2]]); }
+    const med = k => px.map(p => p[k]).sort((a, b) => a - b)[px.length >> 1], R0 = med(0), G0 = med(1), B0 = med(2);
+    ed.ref = [R0 - G0, G0 - B0, R0 + G0 + B0];
+  }
+  else if(ed.step === 1){
+    const dx = x - ed.o[0], dy = y - ed.o[1], d = Math.hypot(dx, dy);
+    if(d < 12){ toast("Troppo vicino: tocca il centro dell'esagono accanto"); return; }
+    ed.a = [dx, dy]; ed.b = [dx * .5 - dy * .8660254, dx * .8660254 + dy * .5]; ed.d = d; ed.step = 2;   // secondo asse: il primo ruotato di 60°
+    ed.busy = true; $("#edMsg").textContent = "Sto analizzando la foto…";
+    setTimeout(() => { if(!ed) return; edRefine(); edDetect(); ed.busy = false; edRender(); }, 30);   // lascia comparire il messaggio prima del calcolo
+    return;
+  }else{
+    const near = list => list.findIndex(p => Math.hypot(p.x - x, p.y - y) < ed.d * .55), [kind, val] = ed.brush.split(":"), key = edCell(x, y).join(",");
+    if(ed.brush === "erase"){                                  // toglie prima il pezzo sopra, poi l'esagono
+      const i = near(ed.carps), j = near(ed.objects);
+      if(i >= 0) ed.carps.splice(i, 1); else if(j >= 0) ed.objects.splice(j, 1); else ed.cells.delete(key);
+    }else if(kind === "carp"){
+      const i = near(ed.carps), cols = Object.keys(KOI_COLORS);
+      if(i >= 0 && ed.carps[i].size === val) ed.carps[i].color = cols[(cols.indexOf(ed.carps[i].color) + 1) % cols.length];   // ritoccarla cambia colore
+      else if(i >= 0) ed.carps[i].size = val;
+      else ed.carps.push({x, y, size:val, color:"red_white"});
+    }else if(kind === "obj"){
+      const j = near(ed.objects);
+      if(j >= 0) ed.objects[j].kind = val; else ed.objects.push({x, y, kind:val});
+    }else ed.cells.set(key, ed.brush);
+  }
+  edRender();
+}
+function edSave(){
+  const s = findScore(ed.id), W = ed.aw, H = ed.ah;
+  if(!ed.cells.size){ toast("Nessun esagono: tocca la foto per aggiungerne"); return; }
+  if(s){
+    s.pond = {
+      aspect:W / H, grid:{ox:ed.o[0] / W, oy:ed.o[1] / H, ax:ed.a[0] / W, ay:ed.a[1] / H, bx:ed.b[0] / W, by:ed.b[1] / H},
+      cells:[...ed.cells].map(([k, kind]) => { const [q, r] = k.split(",").map(Number), [x, y] = edXY(q, r); return {x:x / W, y:y / H, kind, q, r}; }),
+      carps:ed.carps.map(c => ({x:c.x / W, y:c.y / H, size:c.size, color:c.color})),
+      objects:ed.objects.map(c => ({x:c.x / W, y:c.y / H, kind:c.kind})),
+    };
+    s.updated = Date.now(); s.dirty = true;
+  }
+  edClose(); persist(); renderMatches(); sync();
+  toast("Il laghetto ha preso vita");
+}
+function edClose(){ const ov = $("#pondEd"); if(ov) ov.remove(); ed = null; }
+
+/* ---------- Laghetto vivo: griglia e animazione ---------- */
+const pondScenes = new Map();
+function pondScene(s){
+  const key = s.id + ":" + s.updated;
+  if(pondScenes.has(key)) return pondScenes.get(key);
+  // La griglia arriva dall'editor (origine e due assi, in frazioni della foto). Nella foto può essere inclinata:
+  // qui ogni cosa viene riportata su una griglia regolare, usando riga e colonna degli esagoni.
+  const A = s.pond.aspect || 1, G = s.pond.grid;
+  const go = [G.ox * A, G.oy], ga = [G.ax * A, G.ay], gb = [G.bx * A, G.by], det = ga[0] * gb[1] - ga[1] * gb[0];
+  const d = (Math.hypot(ga[0], ga[1]) + Math.hypot(gb[0], gb[1])) / 2, th = Math.atan2(ga[1], ga[0]), R = d / Math.sqrt(3);
+  const at = (q, r) => ({x:d * (q * Math.cos(th) + r * Math.cos(th + Math.PI / 3)), y:d * (q * Math.sin(th) + r * Math.sin(th + Math.PI / 3))});
+  const move = p => { const dx = p.x * A - go[0], dy = p.y - go[1]; return at((dx * gb[1] - dy * gb[0]) / det, (ga[0] * dy - ga[1] * dx) / det); };   // punto della foto -> griglia regolare
+  const list = s.pond.cells.map(c => Object.assign(at(c.q, c.r), {kind:c.kind, seed:Math.abs(c.q * 7919 + c.r * 104729) % 1000 / 1000}));
+  const scene = {
+    cells:list, R, th,
+    carps:(s.pond.carps || []).map((c, i) => Object.assign(move(c), {size:c.size, color:c.color, seed:(i * .37 + .11) % 1})),
+    objects:(s.pond.objects || []).map(ob => Object.assign(move(ob), {kind:ob.kind})),
+    ripples:[],
+  };
+  // Il riquadro comprende anche gli obiettivi, che sporgono dagli esagoni (salice, cascata, ponticello).
+  const ext = list.map(c => [c.x, c.y, 1.6, 2.2, 1.6]).concat(scene.objects.map(o => [o.x, o.y, 2.4, 2.6, 1.6]));
+  scene.x0 = Math.min(...ext.map(e => e[0] - R * e[2])); scene.x1 = Math.max(...ext.map(e => e[0] + R * e[2]));
+  scene.y0 = Math.min(...ext.map(e => e[1] - R * e[3])); scene.y1 = Math.max(...ext.map(e => e[1] + R * e[4]));
+  pondScenes.set(key, scene);
+  return scene;
+}
+// Tutto il laghetto è disegnato a mano sul canvas: nessuna immagine ritagliata dalle foto.
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const KOI_COLORS = {
+  red_white:{base:"#fbf7ef", spots:["#e24a2c","#d53a22"], fin:"#fdf3e6"},
+  orange:{base:"#f59a1c", spots:["#ffcf73","#fbb53c"], fin:"#ffc45c"},
+  yellow:{base:"#f7d438", spots:["#fff0a3","#f4b92e"], fin:"#ffe57a"},
+  blue:{base:"#eaf2f7", spots:["#2f6fb5","#1d4479"], fin:"#cfe3f2"},
+  black_white:{base:"#f5f5f2", spots:["#25252b","#3a3a44"], fin:"#e6e6e2"},
+  red_black:{base:"#f6f2ea", spots:["#dc4329","#25252b"], fin:"#f1e2d6"},
+};
+function hexAdd(p, x, y, R, th){
+  for(let i = 0; i < 6; i++){ const a = th + Math.PI / 6 + i * Math.PI / 3; p[i ? "lineTo" : "moveTo"](x + R * Math.cos(a), y + R * Math.sin(a)); }
+  p.closePath();
+}
+// Sagoma irregolare e morbida: sassi, chiome, macchie.
+function blob(g, x, y, r, seed, squash, n){
+  n = n || 9; squash = squash || 1;
+  const pt = i => { const a = (i % n) / n * 6.283, rr = r * (.78 + .3 * hash(seed + (i % n) * 1.7)); return [x + Math.cos(a) * rr, y + Math.sin(a) * rr * squash]; };
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  g.beginPath();
+  const m0 = mid(pt(n - 1), pt(0)); g.moveTo(m0[0], m0[1]);
+  for(let i = 0; i < n; i++){ const p = pt(i), m = mid(p, pt(i + 1)); g.quadraticCurveTo(p[0], p[1], m[0], m[1]); }
+  g.closePath();
+}
+function shade(g, x0, y0, x1, y1, a, b){ const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, a); gr.addColorStop(1, b); return gr; }
+function drawRock(g, x, y, r, seed, tone){
+  g.fillStyle = "rgba(15,30,25,.28)"; g.beginPath(); g.ellipse(x + r * .14, y + r * .34, r * .95, r * .5, 0, 0, 7); g.fill();
+  blob(g, x, y, r, seed, .82);
+  g.fillStyle = shade(g, x - r, y - r, x + r, y + r, tone ? "#eeeae0" : "#dedad0", tone ? "#a29e94" : "#7f7b73"); g.fill();
+  g.strokeStyle = "rgba(50,45,40,.35)"; g.lineWidth = 1; g.stroke();
+  blob(g, x - r * .2, y - r * .24, r * .42, seed + 3, .7); g.fillStyle = "rgba(255,255,255,.3)"; g.fill();
+}
+function drawTuft(g, x, y, s, seed){
+  g.strokeStyle = hash(seed) > .5 ? "#3f7a34" : "#5c9a44"; g.lineWidth = Math.max(1, s * .12); g.lineCap = "round";
+  for(let i = -2; i <= 2; i++){ g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + i * s * .15, y - s * .6, x + i * s * .4, y - s * (1 - Math.abs(i) * .15)); g.stroke(); }
+}
+
+// Sfondo statico (giardino, sponde, fondale): disegnato una volta sola per dimensione.
+function pondBackdrop(sc, W, H, dpr, k){
+  const c = document.createElement("canvas"); c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const g = c.getContext("2d"); g.scale(dpr, dpr);
+  const R = sc.R * k, X = q => (q.x - sc.x0) * k, Y = q => (q.y - sc.y0) * k, land = q => q.kind === "shore" || q.kind === "lantern";
+  g.fillStyle = shade(g, 0, 0, W, H, "#6f9a4c", "#3f6a36"); g.fillRect(0, 0, W, H);
+  for(let i = 0; i < W * H / 500; i++){                       // erba: puntini e ciuffi
+    g.fillStyle = hash(i * 3.1) > .5 ? "rgba(30,70,30,.25)" : "rgba(190,220,120,.22)";
+    g.beginPath(); g.arc(hash(i) * W, hash(i + .5) * H, 1 + hash(i * 7) * 2, 0, 7); g.fill();
+  }
+  for(let i = 0; i < W * H / 9000; i++) drawTuft(g, hash(i * 2.3) * W, hash(i * 5.9) * H, R * .28, i);
+  const all = new Path2D(), water = new Path2D(), hole = new Path2D();
+  hole.rect(-10, -10, W + 20, H + 20);
+  for(const q of sc.cells){ hexAdd(all, X(q), Y(q), R, sc.th); if(!land(q)){ hexAdd(water, X(q), Y(q), R * 1.01, sc.th); hexAdd(hole, X(q), Y(q), R, sc.th); } }
+  g.lineJoin = "round";
+  g.save(); g.shadowColor = "rgba(0,0,0,.4)"; g.shadowBlur = R * .35; g.shadowOffsetY = R * .08;
+  g.strokeStyle = "#4a3c28"; g.lineWidth = R * .46; g.stroke(all); g.restore();      // bordo di terra
+  g.strokeStyle = "#d3c49a"; g.lineWidth = R * .24; g.stroke(all);                   // riva sabbiosa
+  const cx = (sc.x1 - sc.x0) * k / 2, cy = (sc.y1 - sc.y0) * k / 2;
+  const wg = g.createRadialGradient(cx, cy, R, cx, cy, Math.max(W, H) * .62); wg.addColorStop(0, "#63c4c0"); wg.addColorStop(.6, "#3a9ea6"); wg.addColorStop(1, "#22707f");
+  g.fillStyle = wg; g.fill(water);
+  g.save(); g.clip(water);
+  for(let i = 0; i < 60; i++){                                // fondale: chiazze e ciottoli
+    const x = hash(i * 1.3) * W, y = hash(i * 4.7) * H;
+    blob(g, x, y, R * (.5 + hash(i) * .9), i, .7); g.fillStyle = i % 2 ? "rgba(10,60,70,.1)" : "rgba(160,235,225,.1)"; g.fill();
+  }
+  for(let i = 0; i < W * H / 1400; i++){ g.fillStyle = "rgba(15,55,60,.16)"; g.beginPath(); g.ellipse(hash(i * 9.1) * W, hash(i * 2.9) * H, R * .07, R * .045, hash(i) * 3, 0, 7); g.fill(); }
+  g.strokeStyle = "rgba(255,255,255,.07)"; g.lineWidth = 1;
+  for(const q of sc.cells) if(!land(q)){ g.beginPath(); hexAdd(g, X(q), Y(q), R, sc.th); g.stroke(); }
+  g.shadowColor = "rgba(5,35,45,.75)"; g.shadowBlur = R * .55; g.fillStyle = "#000"; g.fill(hole, "evenodd");   // ombra della riva sull'acqua
+  g.restore();
+  for(const q of sc.cells) if(land(q)){                       // sponde: prato, muschio e sassi
+    const x = X(q), y = Y(q), s = q.seed * 97;
+    g.beginPath(); hexAdd(g, x, y, R * 1.02, sc.th); g.fillStyle = shade(g, x - R, y - R, x + R, y + R, "#9cc06c", "#6f9a4c"); g.fill();
+    g.save(); g.clip();
+    for(let i = 0; i < 14; i++){ g.fillStyle = i % 2 ? "rgba(60,110,50,.3)" : "rgba(215,235,150,.3)"; g.beginPath(); g.arc(x + (hash(s + i) - .5) * R * 1.8, y + (hash(s + i * 3) - .5) * R * 1.8, R * .07, 0, 7); g.fill(); }
+    g.restore();
+    const n = 4 + Math.floor(hash(s) * 3);
+    for(let i = 0; i < n; i++){ const a = hash(s + 1) * 6.28 + i * 6.28 / n, rr = R * (.42 + .22 * hash(s + i * 5)); drawRock(g, x + Math.cos(a) * rr, y + Math.sin(a) * rr * .9, R * (.2 + .13 * hash(s + i * 2)), s + i, i % 3 === 0); }
+    drawTuft(g, x + (hash(s + 8) - .5) * R * .5, y + R * .1, R * .3, s);
+  }
+  sc.bg = c; sc.water = water; sc.bgKey = W + "x" + dpr;
+}
+
+function drawCaustics(g, t, W, H, R, alpha){
+  g.strokeStyle = `rgba(255,255,255,${alpha})`; g.lineCap = "round";
+  for(const [rot, sp] of [[.5, .5], [-.7, .37]]){
+    g.save(); g.translate(W / 2, H / 2); g.rotate(rot); g.translate(-W, -H);
+    for(let j = 0; j < 12; j++){
+      g.lineWidth = R * (.08 + .1 * hash(j + rot)); g.beginPath();
+      for(let x = 0; x <= W * 2; x += R * .45){
+        const y = j * H / 5.5 + Math.sin(x * .016 + t * sp + j) * R * .55 + Math.sin(x * .041 - t * sp * 1.7 + j * 2) * R * .22;
+        x ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+    g.restore();
+  }
+}
+// Carpa vista dall'alto: il corpo ondeggia lungo una spina dorsale, pinne e coda seguono.
+function drawKoi(g, x, y, L, ang, col, ph, seed, fancy){
+  const n = 12, sp = [];
+  for(let i = 0; i <= n; i++){ const s = i / n; sp.push([L * (.5 - s), (L * .012 + L * .1 * s * s) * Math.sin(ph - s * 3.4)]); }
+  const wid = s => L * (s < .22 ? .078 + .29 * s : .142 * Math.pow(1 - (s - .22) / .78, .8) + .012);
+  const side = sgn => sp.map((p, i) => { const a = sp[Math.max(0, i - 1)], b = sp[Math.min(n, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, w = wid(i / n); return [p[0] - sgn * dy / l * w, p[1] + sgn * dx / l * w]; });
+  const up = side(1), dn = side(-1);
+  const body = () => {
+    g.beginPath(); g.moveTo(sp[0][0] + L * .06, sp[0][1]);
+    g.quadraticCurveTo(up[0][0] + L * .04, up[0][1], up[1][0], up[1][1]);
+    for(let i = 2; i <= n; i++) g.lineTo(up[i][0], up[i][1]);
+    for(let i = n; i >= 1; i--) g.lineTo(dn[i][0], dn[i][1]);
+    g.quadraticCurveTo(dn[0][0] + L * .04, dn[0][1], sp[0][0] + L * .06, sp[0][1]); g.closePath();
+  };
+  const fin = (px, py, rot, len, w) => { g.save(); g.translate(px, py); g.rotate(rot); g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-len * .3, -w, -len * .9, -w * .9, -len, 0); g.bezierCurveTo(-len * .8, w * .5, -len * .3, w * .4, 0, 0); g.fill(); g.restore(); };
+  g.save(); g.translate(x + L * .06, y + L * .1); g.rotate(ang); body(); g.fillStyle = "rgba(6,35,45,.24)"; g.fill(); g.restore();   // ombra sul fondo
+  g.save(); g.translate(x, y); g.rotate(ang);
+  const T = sp[n], Tp = sp[n - 2], ta = Math.atan2(T[1] - Tp[1], T[0] - Tp[0]), wag = Math.sin(ph - 4.2) * .55;
+  const fl = L * (fancy ? .62 : .3), fw = L * (fancy ? .3 : .17), pl = L * (fancy ? .34 : .17);
+  g.globalAlpha = .88; g.fillStyle = col.fin;
+  g.save(); g.translate(T[0], T[1]); g.rotate(ta + wag);                                         // coda a due lobi
+  g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(L * .08, -L * .03, fl * .7, -fw * .9, fl, -fw * 1.1); g.quadraticCurveTo(fl * .66, 0, fl, fw * 1.1); g.bezierCurveTo(fl * .7, fw * .9, L * .08, L * .03, 0, 0); g.fill();
+  g.restore();
+  for(const [pts, sg] of [[up, -1], [dn, 1]]){                                                   // pinne pettorali e ventrali
+    fin(pts[3][0], pts[3][1], -sg * (.95 + .22 * Math.sin(ph * .9 + sg)), pl, pl * .42);
+    fin(pts[7][0], pts[7][1], -sg * (.7 + .2 * Math.sin(ph * .9 + 2)), pl * .6, pl * .26);
+  }
+  g.globalAlpha = 1;
+  body(); g.fillStyle = col.base; g.fill();
+  g.save(); body(); g.clip();
+  for(let m = 0; m < 6; m++){                                                                    // livrea
+    const s = .05 + .82 * hash(seed * 9 + m * 1.3), p = sp[Math.round(s * n)], w = wid(s);
+    blob(g, p[0], p[1] + (hash(seed * 5 + m * 3) - .5) * w * 1.3, L * (.05 + .07 * hash(seed + m)), seed + m, w / (L * .1), 7);
+    g.fillStyle = col.spots[m % col.spots.length]; g.fill();
+  }
+  g.strokeStyle = "rgba(255,255,255,.3)"; g.lineWidth = L * .028; g.lineCap = "round"; g.beginPath();   // riflesso sul dorso
+  for(let i = 2; i <= 8; i++) i === 2 ? g.moveTo(sp[i][0], sp[i][1]) : g.lineTo(sp[i][0], sp[i][1]);
+  g.stroke(); g.restore();
+  body(); g.strokeStyle = "rgba(40,30,20,.25)"; g.lineWidth = 1; g.stroke();
+  g.fillStyle = "#17171c"; for(const pts of [up, dn]){ g.beginPath(); g.arc(pts[1][0] * .96 + sp[1][0] * .04, pts[1][1] * .8 + sp[1][1] * .2, L * .016, 0, 7); g.fill(); }
+  g.restore();
+}
+function drawLily(g, x, y, R, t, seed, purple){
+  const bob = 1 + Math.sin(t * 1.1 + seed * 6.28) * .035, rot = seed * 6.28 + Math.sin(t * .35 + seed * 9) * .18, r = R * .7;
+  g.fillStyle = "rgba(5,40,50,.25)"; g.beginPath(); g.ellipse(x + R * .08, y + R * .12, r, r * .95, 0, 0, 7); g.fill();
+  g.save(); g.translate(x, y); g.rotate(rot); g.scale(bob, bob);
+  const pg = g.createRadialGradient(-r * .2, -r * .2, r * .1, 0, 0, r); pg.addColorStop(0, "#7fca5c"); pg.addColorStop(1, "#2f7f3c");
+  g.fillStyle = pg; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r, .32, 6.283 - .06); g.closePath(); g.fill();
+  g.strokeStyle = "rgba(20,70,35,.6)"; g.lineWidth = 1; g.stroke();
+  g.strokeStyle = "rgba(220,255,200,.22)"; for(let i = 1; i < 9; i++){ const a = .32 + i * (5.9 / 9); g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * r * .92, Math.sin(a) * r * .92); g.stroke(); }
+  const tip = purple ? "#e2d6ff" : "#ffe3ee", core = purple ? "#6f3fc4" : "#e4578f";
+  for(const [cnt, len, off] of [[9, .46, 0], [7, .36, .35], [5, .24, .1]]){            // tre giri di petali
+    for(let i = 0; i < cnt; i++){
+      g.save(); g.rotate(off + i * 6.283 / cnt);
+      const L2 = r * len; g.fillStyle = shade(g, 0, 0, L2, 0, core, tip);
+      g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(L2 * .5, -L2 * .34, L2, 0); g.quadraticCurveTo(L2 * .5, L2 * .34, 0, 0); g.fill();
+      g.strokeStyle = "rgba(120,30,70,.18)"; g.stroke(); g.restore();
+    }
+  }
+  g.fillStyle = "#f8d548"; g.beginPath(); g.arc(0, 0, r * .09, 0, 7); g.fill();
+  g.restore();
+}
+function drawLeaf(g, x, y, s, rot, color){                    // foglia d'acero
+  g.save(); g.translate(x, y); g.rotate(rot);
+  g.fillStyle = "rgba(5,40,50,.2)"; g.beginPath(); g.ellipse(s * .12, s * .16, s * .7, s * .5, 0, 0, 7); g.fill();
+  g.fillStyle = color; g.beginPath();
+  for(let i = 0; i < 5; i++){ const a = -1.57 + (i - 2) * .62, l = s * (i === 2 ? 1 : i % 2 ? .86 : .62); g.lineTo(Math.cos(a - .2) * l * .42, Math.sin(a - .2) * l * .42); g.lineTo(Math.cos(a) * l, Math.sin(a) * l); g.lineTo(Math.cos(a + .2) * l * .42, Math.sin(a + .2) * l * .42); }
+  g.lineTo(0, s * .3); g.closePath(); g.fill();
+  g.restore();
+}
+function stone(g){ return shade(g, -1, 0, 1, 0, "#e3e0d6", "#96928a"); }
+function drawLantern(g, x, y, s, t, seed){                    // lanterna di pietra (tōrō)
+  const fl = .55 + Math.sin(t * 2.3 + seed * 6) * .12 + Math.sin(t * 7.3 + seed) * .06;
+  g.save(); g.translate(x, y + s * .3);
+  g.fillStyle = "rgba(10,30,20,.3)"; g.beginPath(); g.ellipse(s * .12, 0, s * .6, s * .2, 0, 0, 7); g.fill();
+  g.strokeStyle = "rgba(70,65,58,.7)"; g.lineWidth = 1; g.lineJoin = "round";
+  const part = pts => { g.beginPath(); pts.forEach((p, i) => g[i ? "lineTo" : "moveTo"](p[0] * s, p[1] * s)); g.closePath(); g.fillStyle = shade(g, -s * .5, 0, s * .5, 0, "#e6e3da", "#9a968d"); g.fill(); g.stroke(); };
+  part([[-.44,0],[.44,0],[.36,-.14],[-.36,-.14]]); part([[-.13,-.14],[.13,-.14],[.11,-.62],[-.11,-.62]]);
+  part([[-.38,-.62],[.38,-.62],[.3,-.74],[-.3,-.74]]); part([[-.24,-.74],[.24,-.74],[.24,-1.08],[-.24,-1.08]]);
+  g.fillStyle = `rgba(255,${200 + fl * 40},110,${.75 + fl * .25})`; g.fillRect(-s * .13, -s * 1.02, s * .26, s * .22);
+  g.strokeStyle = "rgba(70,65,58,.8)"; g.beginPath(); g.moveTo(0, -s * 1.02); g.lineTo(0, -s * .8); g.moveTo(-s * .13, -s * .91); g.lineTo(s * .13, -s * .91); g.stroke();
+  g.beginPath(); g.moveTo(-s * .66, -s * 1.12); g.quadraticCurveTo(-s * .34, -s * 1.1, -s * .12, -s * 1.44); g.lineTo(s * .12, -s * 1.44); g.quadraticCurveTo(s * .34, -s * 1.1, s * .66, -s * 1.12);
+  g.quadraticCurveTo(s * .3, -s * 1.02, 0, -s * 1.04); g.quadraticCurveTo(-s * .3, -s * 1.02, -s * .66, -s * 1.12); g.closePath();
+  g.fillStyle = shade(g, -s * .6, -s * 1.4, s * .6, -s, "#d9d6cc", "#7f7b73"); g.fill(); g.stroke();
+  g.beginPath(); g.arc(0, -s * 1.5, s * .075, 0, 7); g.fillStyle = "#b9b5ab"; g.fill(); g.stroke();
+  g.fillStyle = "rgba(90,140,60,.55)"; blob(g, -s * .3, -s * 1.2, s * .1, seed, .5); g.fill(); blob(g, s * .2, -s * .08, s * .09, seed + 2, .5); g.fill();
+  g.globalCompositeOperation = "lighter";
+  const gl = g.createRadialGradient(0, -s * .9, 0, 0, -s * .9, s * 1.7); gl.addColorStop(0, `rgba(255,205,110,${fl * .55})`); gl.addColorStop(1, "rgba(255,205,110,0)");
+  g.fillStyle = gl; g.beginPath(); g.arc(0, -s * .9, s * 1.7, 0, 7); g.fill();
+  g.restore();
+}
+const POND_ART = {
+  cascata(g, s, t){
+    for(const [x, y, r, sd] of [[-.95,.1,.62,1],[.95,.12,.6,2],[-.55,-.55,.6,3],[.6,-.6,.58,4],[0,-1.0,.6,5],[-1.25,.45,.4,6],[1.25,.45,.38,7]]) drawRock(g, x * s, y * s, r * s, sd, sd % 2);
+    g.save(); g.beginPath(); g.moveTo(-s * .26, -s * 1.15); g.bezierCurveTo(-s * .3, -s * .5, -s * .5, 0, -s * .42, s * .62); g.lineTo(s * .42, s * .62); g.bezierCurveTo(s * .5, 0, s * .3, -s * .5, s * .26, -s * 1.15); g.closePath();
+    g.fillStyle = shade(g, 0, -s * 1.15, 0, s * .62, "#d9f6f4", "#63c9cc"); g.fill(); g.clip();
+    g.strokeStyle = "rgba(255,255,255,.85)"; g.lineCap = "round";
+    for(let i = 0; i < 9; i++){ const x = (i / 8 - .5) * s * .8, y = ((t * (.9 + hash(i) * .5) + hash(i * 3)) % 1) * s * 1.9 - s * 1.25; g.lineWidth = s * (.03 + .03 * hash(i * 7)); g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + s * .32); g.stroke(); }
+    g.restore();
+    for(let i = 0; i < 7; i++){ const a = t * 2 + i * 1.7, r = s * (.12 + .06 * Math.sin(a)); g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.arc((i / 6 - .5) * s * .9, s * (.64 + .05 * Math.sin(a * 1.3)), r, 0, 7); g.fill(); }
+    for(let i = 0; i < 3; i++){ const a = (t * .5 + i / 3) % 1; g.strokeStyle = `rgba(255,255,255,${.5 * (1 - a)})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, s * .78, s * (.4 + a * .9), s * (.14 + a * .3), 0, 0, 7); g.stroke(); }
+    drawTuft(g, -s * .7, -s * .2, s * .3, 1); drawTuft(g, s * .75, -s * .25, s * .3, 2);
+  },
+  salice(g, s, t){
+    g.fillStyle = "rgba(10,35,25,.28)"; g.beginPath(); g.ellipse(s * .2, s * .55, s * 1.3, s * .4, 0, 0, 7); g.fill();
+    g.strokeStyle = "#6b4526"; g.lineWidth = s * .26; g.lineCap = "round"; g.beginPath(); g.moveTo(-s * .7, s * .5); g.bezierCurveTo(-s * .7, -s * .3, -s * .2, -s * .9, s * .2, -s * 1.1); g.stroke();
+    g.strokeStyle = "#8a5d36"; g.lineWidth = s * .08; g.beginPath(); g.moveTo(-s * .76, s * .4); g.bezierCurveTo(-s * .76, -s * .3, -s * .3, -s * .85, s * .1, -s * 1.08); g.stroke();
+    for(let i = 0; i < 7; i++){ blob(g, (-.5 + i * .27) * s, (-1.25 + Math.abs(i - 3) * .09) * s, s * .5, i, .75); g.fillStyle = i % 2 ? "#5a9a3c" : "#417f33"; g.fill(); }
+    for(let i = 0; i < 34; i++){                              // fronde che ondeggiano
+      const x0 = (-.85 + hash(i) * 2.2) * s, y0 = (-1.25 + hash(i * 3) * .3) * s, len = s * (.9 + hash(i * 5) * .9), sway = Math.sin(t * 1.1 + i * .7) * s * .1;
+      g.strokeStyle = ["#7fbf4f","#5fa33f","#9bd062","#4c8c37"][i % 4]; g.lineWidth = s * (.05 + .04 * hash(i * 9)); g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + sway * .4, y0 + len * .5, x0 + sway, y0 + len); g.stroke();
+    }
+  },
+  ponticello(g, s, t){
+    g.fillStyle = "rgba(10,35,45,.3)"; g.beginPath(); g.ellipse(0, s * .5, s * 1.5, s * .28, 0, 0, 7); g.fill();
+    const arc = (y, lift, w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineCap = "round"; g.beginPath(); g.moveTo(-s * 1.45, y); g.quadraticCurveTo(0, y - lift, s * 1.45, y); g.stroke(); };
+    arc(s * .32, s * 1.0, s * .3, "#7b1f17"); arc(s * .24, s * 1.0, s * .22, "#c9382a");
+    g.strokeStyle = "rgba(90,20,15,.5)"; g.lineWidth = 1;
+    for(let i = -6; i <= 6; i++){ const x = i * s * .21, y = s * .24 - s * .5 * (1 - (x / (s * 1.45)) ** 2); g.beginPath(); g.moveTo(x, y - s * .1); g.lineTo(x, y + s * .1); g.stroke(); }
+    for(let i = -4; i <= 4; i++){ const x = i * s * .34, y = s * .24 - s * .5 * (1 - (x / (s * 1.45)) ** 2); g.strokeStyle = "#d9412f"; g.lineWidth = s * .07; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - s * .5); g.stroke(); }
+    arc(-s * .22, s * 1.0, s * .09, "#e2503c"); arc(-s * .02, s * 1.0, s * .05, "#d9412f");
+    for(const x of [-1.45, 1.45]){ g.fillStyle = "#b02c20"; g.fillRect(x * s - s * .09, -s * .42, s * .18, s * .8); g.fillStyle = "#2b2622"; g.fillRect(x * s - s * .13, -s * .52, s * .26, s * .12); }
+  },
+  shishi(g, s, t){
+    drawRock(g, 0, s * .35, s * .62, 11, 1);
+    g.fillStyle = "#5bbfc4"; g.beginPath(); g.ellipse(0, s * .3, s * .34, s * .16, 0, 0, 7); g.fill();
+    const bamboo = (x0, y0, x1, y1, w) => { g.strokeStyle = "#5d8f2f"; g.lineWidth = w; g.lineCap = "butt"; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); g.strokeStyle = "#a8cf5a"; g.lineWidth = w * .35; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+    bamboo(-s * .3, s * .3, -s * .3, -s * .7, s * .12); bamboo(s * .3, s * .3, s * .3, -s * .7, s * .12);
+    const cyc = (t * .28) % 1, ang = cyc < .85 ? -.5 + cyc / .85 * .85 : .35 - (cyc - .85) / .15 * .85;   // si riempie piano, poi scatta
+    g.strokeStyle = "rgba(220,250,255,.9)"; g.lineWidth = s * .04; g.beginPath(); g.moveTo(-s * .85, -s * 1.0); g.quadraticCurveTo(-s * .6, -s * 1.0, -s * .5, -s * .5); g.stroke();
+    bamboo(-s * 1.2, -s * 1.0, -s * .8, -s * 1.0, s * .1);
+    g.save(); g.translate(0, -s * .45); g.rotate(ang); bamboo(-s * .75, 0, s * .6, 0, s * .17); g.restore();
+    if(cyc > .85){ const a = (cyc - .85) / .15; g.strokeStyle = `rgba(255,255,255,${.7 * (1 - a)})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(s * .5, s * .15, s * (.1 + a * .4), s * (.05 + a * .15), 0, 0, 7); g.stroke(); }
+  },
+  statua(g, s, t){
+    g.fillStyle = "rgba(10,30,20,.3)"; g.beginPath(); g.ellipse(s * .15, s * .5, s * 1.0, s * .28, 0, 0, 7); g.fill();
+    const st = () => shade(g, -s, 0, s, 0, "#e0ddd3", "#8d8980");
+    g.strokeStyle = "rgba(70,65,58,.6)"; g.lineWidth = 1;
+    for(let i = -3; i <= 3; i++){ g.beginPath(); g.ellipse(i * s * .25, s * .36, s * .2, s * .14, 0, 0, 7); g.fillStyle = st(); g.fill(); g.stroke(); }   // base a fiore di loto
+    g.beginPath(); g.moveTo(-s * .78, s * .3); g.quadraticCurveTo(-s * .8, -s * .05, -s * .4, -s * .1); g.quadraticCurveTo(-s * .5, -s * .75, 0, -s * .8); g.quadraticCurveTo(s * .5, -s * .75, s * .4, -s * .1); g.quadraticCurveTo(s * .8, -s * .05, s * .78, s * .3); g.closePath(); g.fillStyle = st(); g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(0, s * .1, s * .32, s * .1, 0, 0, 7); g.fillStyle = "rgba(120,115,105,.5)"; g.fill();                                       // mani in grembo
+    g.beginPath(); g.arc(0, -s * 1.02, s * .27, 0, 7); g.fillStyle = st(); g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, -s * 1.3, s * .1, 0, 7); g.fill(); g.stroke();
+    for(const sg of [-1, 1]){ g.beginPath(); g.ellipse(sg * s * .28, -s * .98, s * .05, s * .13, 0, 0, 7); g.fill(); g.stroke(); }
+    g.strokeStyle = "rgba(70,65,58,.55)"; g.beginPath(); g.arc(-s * .09, -s * 1.03, s * .05, .2, 2.9); g.stroke(); g.beginPath(); g.arc(s * .09, -s * 1.03, s * .05, .2, 2.9); g.stroke();
+    g.fillStyle = "rgba(90,140,60,.5)"; blob(g, -s * .45, s * .1, s * .16, 3, .6); g.fill(); blob(g, s * .3, -s * .5, s * .12, 5, .6); g.fill();
+  },
+  tartaruga(g, s, t){
+    drawRock(g, 0, s * .2, s * .75, 21, 1);
+    const head = Math.sin(t * .7) * .5 + .5;
+    g.fillStyle = "#7f9a4a"; g.strokeStyle = "rgba(40,60,25,.6)"; g.lineWidth = 1;
+    for(const [x, y, sg] of [[-.34,-.3,-1],[.34,-.3,1],[-.36,.22,-1],[.36,.22,1]]){ g.beginPath(); g.ellipse(x * s, (y - .05) * s, s * .15, s * .09, sg * (.6 + Math.sin(t * 1.3 + x * 9) * .15), 0, 7); g.fill(); g.stroke(); }
+    g.beginPath(); g.ellipse(0, -s * (.5 + head * .12), s * .12, s * .16, 0, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = "#17171c"; for(const sg of [-1, 1]){ g.beginPath(); g.arc(sg * s * .06, -s * (.56 + head * .12), s * .02, 0, 7); g.fill(); }
+    const sh = g.createRadialGradient(-s * .1, -s * .15, s * .05, 0, -s * .05, s * .45); sh.addColorStop(0, "#6f8f3c"); sh.addColorStop(1, "#2f4f24");
+    g.fillStyle = sh; g.beginPath(); g.ellipse(0, -s * .05, s * .38, s * .44, 0, 0, 7); g.fill(); g.strokeStyle = "#1f3518"; g.lineWidth = 1.5; g.stroke();
+    g.strokeStyle = "rgba(20,40,15,.7)"; g.lineWidth = 1; g.beginPath(); hexAdd(g, 0, -s * .05, s * .17, 0); g.stroke();
+    for(let i = 0; i < 6; i++){ const a = Math.PI / 6 + i * Math.PI / 3; g.beginPath(); g.moveTo(Math.cos(a) * s * .17, -s * .05 + Math.sin(a) * s * .17); g.lineTo(Math.cos(a) * s * .36, -s * .05 + Math.sin(a) * s * .42); g.stroke(); }
+  },
+  rami(g, s, t){
+    g.rotate(.35);
+    const br = (pts, w) => { for(const [c, k] of [["rgba(8,35,45,.3)", 1.35], ["#5a3a20", 1], ["#8c6238", .4]]){ g.strokeStyle = c; g.lineWidth = w * k; g.lineCap = "round"; g.beginPath(); g.moveTo(pts[0] * s, pts[1] * s + (k > 1 ? s * .1 : 0)); g.quadraticCurveTo(pts[2] * s, pts[3] * s + (k > 1 ? s * .1 : 0), pts[4] * s, pts[5] * s + (k > 1 ? s * .1 : 0)); g.stroke(); } };
+    br([-1.3, .1, -.2, -.25, 1.2, .1], s * .2); br([.1, -.08, .5, -.6, .95, -.75], s * .11); br([-.5, -.05, -.6, -.5, -.3, -.8], s * .1); br([.55, -.4, .9, -.35, 1.15, -.45], s * .07); br([-.1, 0, .1, .4, .5, .55], s * .09);
+  },
+};
+function drawPond(cv, sc, t){
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = cv.clientWidth;
+  if(!W) return;
+  const k = W / (sc.x1 - sc.x0), H = Math.round((sc.y1 - sc.y0) * k);
+  if(cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px"; }
+  if(sc.bgKey !== W + "x" + dpr) pondBackdrop(sc, W, H, dpr, k);
+  const g = cv.getContext("2d"), R = sc.R * k, X = c => (c.x - sc.x0) * k, Y = c => (c.y - sc.y0) * k;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.drawImage(sc.bg, 0, 0, W, H);
+
+  g.save(); g.clip(sc.water);                                 // sott'acqua: luce, carpe, onde
+  drawCaustics(g, t, W, H, R, .05);
+  for(const c of sc.carps){
+    const big = {small:.95, medium:1.5, large:2, centenaria:2.2}[c.size] || 1, dir = c.seed > .5 ? 1 : -1, rot = c.seed * 3.14, rx = R * (.45 + .3 * big), ry = rx * .55;
+    const at = u => { const a = dir * u * (.55 - .1 * big) + c.seed * 6.28, ex = Math.cos(a) * rx, ey = Math.sin(a) * ry; return [X(c) + ex * Math.cos(rot) - ey * Math.sin(rot), Y(c) + ex * Math.sin(rot) + ey * Math.cos(rot)]; };
+    const p = at(t), p2 = at(t + .05);
+    drawKoi(g, p[0], p[1], R * big, Math.atan2(p2[1] - p[1], p2[0] - p[0]), KOI_COLORS[c.color] || KOI_COLORS.red_white, t * (5.5 - big) + c.seed * 10, c.seed * 50 + 1, c.size === "centenaria");
+    if(Math.random() < .006) sc.ripples.push({t0:t, px:p[0], py:p[1]});
+  }
+  drawCaustics(g, t + 40, W, H, R, .055);
+  const wet = sc.cells.filter(c => c.kind !== "shore" && c.kind !== "lantern");
+  if(wet.length && Math.random() < .02){ const c = wet[Math.floor(Math.random() * wet.length)]; sc.ripples.push({t0:t, px:X(c) + (Math.random() - .5) * R, py:Y(c) + (Math.random() - .5) * R}); }
+  sc.ripples = sc.ripples.filter(r => t - r.t0 < 3);
+  for(const r of sc.ripples) for(const lag of [0, .5]){
+    const a = (t - r.t0 - lag) / 2.5; if(a < 0 || a > 1) continue;
+    g.strokeStyle = `rgba(255,255,255,${.55 * (1 - a)})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(r.px, r.py, R * (.12 + a * .85), R * (.1 + a * .7), 0, 0, 7); g.stroke();
+  }
+  wet.forEach((c, i) => {                                     // scintillii sulla superficie
+    const a = Math.pow(Math.max(0, Math.sin(t * 1.3 + c.seed * 40 + i)), 14);
+    if(a < .05) return;
+    const x = X(c) + (hash(i * 3.3) - .5) * R * 1.1, y = Y(c) + (hash(i * 7.7) - .5) * R * 1.1, l = R * .16 * a;
+    g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x - l, y); g.lineTo(x + l, y); g.moveTo(x, y - l); g.lineTo(x, y + l); g.stroke();
+  });
+  g.restore();
+
+  for(const c of sc.cells){                                   // a pelo d'acqua
+    const x = X(c), y = Y(c);
+    if(c.kind === "foliage"){
+      for(let i = 0; i < 5; i++){ const a = c.seed * 6.28 + i * 1.26 + t * .1, rr = R * (.18 + .45 * hash(c.seed * 7 + i)); drawLeaf(g, x + Math.cos(a) * rr, y + Math.sin(a) * rr, R * .2, a * 2 + t * .25, ["#f4b92e","#ee8a22","#d9482b","#f7d046"][i % 4]); }
+    }else if(c.kind === "ninfea" || c.kind === "ninfea_viola") drawLily(g, x, y, R, t, c.seed, c.kind === "ninfea_viola");
+    else if(c.kind === "path"){ drawRock(g, x, y, R * .66, c.seed * 31, 1); g.fillStyle = "rgba(120,150,90,.35)"; blob(g, x + R * .15, y + R * .1, R * .14, c.seed * 5, .6); g.fill(); }
+  }
+  const tall = sc.cells.filter(c => c.kind === "lantern").map(c => ({y:Y(c), draw:() => drawLantern(g, X(c), Y(c), R * .95, t, c.seed)}))
+    .concat(sc.objects.map(ob => ({y:Y(ob), draw:() => { g.save(); g.translate(X(ob), Y(ob)); g.lineJoin = "round"; POND_ART[ob.kind](g, R * .95, t); g.restore(); }})));
+  tall.sort((a, b) => a.y - b.y).forEach(o => o.draw());      // dal fondo verso chi guarda
+
+  const da = t * .35, dx = W * (.5 + .42 * Math.sin(da * 1.3)), dy = H * (.45 + .36 * Math.sin(da * 2.1 + 1)), dh = Math.atan2(Math.cos(da * 2.1 + 1) * 2.1 * H * .36, Math.cos(da * 1.3) * 1.3 * W * .42);
+  g.fillStyle = "rgba(10,30,30,.18)"; g.beginPath(); g.ellipse(dx + R * .3, dy + R * .45, R * .28, R * .08, dh, 0, 7); g.fill();   // libellula e la sua ombra
+  g.save(); g.translate(dx, dy); g.rotate(dh);
+  g.fillStyle = "rgba(230,250,255,.55)"; for(const sg of [-1, 1]) for(const off of [.06, -.08]){ g.beginPath(); g.ellipse(off * R, sg * R * .17, R * .07, R * .19, sg * (.25 + Math.sin(t * 45) * .25), 0, 7); g.fill(); }
+  g.strokeStyle = "#2f7f9a"; g.lineWidth = R * .05; g.lineCap = "round"; g.beginPath(); g.moveTo(-R * .3, 0); g.lineTo(R * .12, 0); g.stroke();
+  g.fillStyle = "#1f5f77"; g.beginPath(); g.arc(R * .14, 0, R * .045, 0, 7); g.fill(); g.restore();
+
+  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.max(W, H) * .75); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(10,30,20,.38)");
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+}
+let pondRaf = 0;
+function pondLoop(now){
+  pondRaf = 0;
+  const cvs = [...document.querySelectorAll("canvas.pondcv")].filter(c => c.offsetParent !== null);
+  for(const cv of cvs){
+    const s = findScore(cv.dataset.pond);
+    if(s && s.pond) drawPond(cv, pondScene(s), reduceMotion ? 0 : now / 1000);
+  }
+  if(cvs.length && !reduceMotion) pondRaf = requestAnimationFrame(pondLoop);
+}
+// Riparte quando un laghetto diventa visibile (dettaglio aperto, cambio scheda) e si ferma da solo quando non ce ne sono.
+function pondKick(){ if(!pondRaf) pondRaf = requestAnimationFrame(pondLoop); }
 
 /* ---------- Libro del regolamento ---------- */
 const TOC = [["Copertina",1],["Contenuto",2],["Preparazione",4],["Il gioco",6],["Le carte",8],["Piazzamento",9],["Fine partita e punteggio",11],["Esempio di punteggio",12],["Gli obiettivi",13],["Solitario",14],["Storia delle Koi",15]];
@@ -1046,7 +1720,7 @@ function showTab(tab){
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   $("#totalChip").classList.toggle("hidden", tab !== "calc");
   if(tab === "rules") layoutBook();
-  if(tab === "matches") sync();
+  if(tab === "matches"){ sync(); pondKick(); }
   window.scrollTo(0, 0);
 }
 let toastTimer;
@@ -1097,6 +1771,12 @@ document.addEventListener("click", e => {
     editScore(el.dataset.id);
   }else if(a === "del-score"){
     deleteScore(el.dataset.id);
+  }else if(a === "pond"){
+    openPondEditor(el.dataset.id);
+  }else if(a === "ed-brush"){ ed.brush = el.dataset.b; edRender();
+  }else if(a === "ed-grid"){ Object.assign(ed, {step:0, o:null, cells:new Map(), carps:[], objects:[]}); edRender();
+  }else if(a === "ed-save"){ edSave();
+  }else if(a === "ed-close"){ edClose();
   }else if(a === "sync"){
     sync();
   }else if(a === "profile"){
@@ -1113,6 +1793,7 @@ document.addEventListener("click", e => {
   }else if(a === "zoom-close"){ closeZoom(); }
 });
 
+$("#matchList").addEventListener("toggle", pondKick, true);   // "toggle" non risale: va ascoltato in cattura
 $("#photoCam").addEventListener("change", onPhoto);
 $("#photoFile").addEventListener("change", onPhoto);
 const bookEl = $("#book");

@@ -1,0 +1,86 @@
+[
+    {
+        "id": 1,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 2,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 3,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 4,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 5,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 6,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 7,
+        "type": "SMALLKOI"
+    },
+    {
+        "id":8,
+        "type": "SMALLKOI"
+    },
+    {
+        "id": 9,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 10,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 11,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 12,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 13,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 14,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 15,
+        "type": "MEDIUMKOI"
+    },
+    {
+        "id": 16,
+        "type": "BIGKOI"
+    },
+    {
+        "id": 17,
+        "type": "BIGKOI"
+    },
+    {
+        "id": 18,
+        "type": "BIGKOI"
+    },
+    {
+        "id": 19,
+        "type": "BIGKOI"
+    },
+    {
+        "id": 20,
+        "type": "BIGKOI"
+    },
+    {
+        "id": 21,
+        "type": "BIGKOI"
+    }
+]

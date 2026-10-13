@@ -1,0 +1,5 @@
+package game.cards;
+
+public enum Actions{
+    PLACEWATER,PLACEBORDER,PLACELANTERN,PLACELEAFS,PLACELILY,PLACEKOI,MOVEKOI;
+}

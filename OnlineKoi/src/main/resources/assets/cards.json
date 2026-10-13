@@ -1,0 +1,314 @@
+[
+    {
+        "id": 1,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+    },
+    {
+        "id": 2,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+    },
+    {
+        "id": 3,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+    },
+    {
+        "id": 4,
+        "type": "HELPER",
+        "playerNum": 3,
+        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+    },
+    {
+        "id": 5,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+    },
+    {
+        "id": 6,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+    },
+    {
+        "id": 7,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+    },
+    {
+        "id": 8,
+        "type": "HELPER",
+        "playerNum": 3,
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+    },
+    {
+        "id": 9,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+    },
+    {
+        "id": 10,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+    },
+    {
+        "id": 11,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+    },
+    {
+        "id": 12,
+        "type": "HELPER",
+        "playerNum": 3,
+        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+    },
+    {
+        "id": 13,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEWATER"]
+    },
+    {
+        "id": 14,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEWATER"]
+    },
+    {
+        "id": 15,
+        "type": "HELPER",
+        "playerNum": 2,
+        "allowedActions": ["PLACEWATER"]
+    },
+    {
+        "id": 16,
+        "type": "HELPER",
+        "playerNum": 3,
+        "allowedActions": ["PLACEWATER"]
+    },
+    {
+        "id": 17,
+        "type": "HELPER",
+        "playerNum": 4,
+        "allowedActions": ["PLACEWATER"]
+    },
+    {
+        "id": 18,
+        "type": "WAREHOUSE",
+        "playerNum": 2,
+        "additionalSpace": 2
+    },
+    {
+        "id": 19,
+        "type": "WAREHOUSE",
+        "playerNum": 2,
+        "additionalSpace": 2
+    },
+    {
+        "id": 20,
+        "type": "WAREHOUSE",
+        "playerNum": 2,
+        "additionalSpace": 2
+    },
+    {
+        "id": 21,
+        "type": "WAREHOUSE",
+        "playerNum": 3,
+        "additionalSpace": 2
+    },
+    {
+        "id": 22,
+        "type": "WAREHOUSE",
+        "playerNum": 4,
+        "additionalSpace": 2
+    },
+    {
+        "id": 23,
+        "type": "MARKET",
+        "playerNum": 2,
+        "discount": 1
+    },
+    {
+        "id": 24,
+        "type": "MARKET",
+        "playerNum": 2,
+        "discount": 1
+    },
+    {
+        "id": 25,
+        "type": "MARKET",
+        "playerNum": 3,
+        "discount": 1
+    },
+    {
+        "id": 26,
+        "type": "MARKET",
+        "playerNum": 4,
+        "discount": 1
+    },
+    {
+        "id": 27,
+        "type": "RAIN",
+        "playerNum": 2,
+        "rainTiles": ["WATER", "WATER", "WATER"]
+    },
+    {
+        "id": 28,
+        "type": "RAIN",
+        "playerNum": 2,
+        "rainTiles": ["LEAF", "WATER"]
+    },
+    {
+        "id": 29,
+        "type": "RAIN",
+        "playerNum": 3,
+        "rainTiles": ["WATER", "WATER"]
+    },
+    {
+        "id": 30,
+        "type": "RAIN",
+        "playerNum": 3,
+        "rainTiles": ["WATER", "WATER"]
+    },
+    {
+        "id": 31,
+        "type": "RAIN",
+        "playerNum": 4,
+        "rainTiles": ["LEAF", "WATER"]
+    },
+    {
+        "id": 32,
+        "type": "RAIN",
+        "playerNum": 4,
+        "rainTiles": ["WATER", "WATER", "WATER"]
+    },
+    {
+        "id": 33,
+        "type": "WELL",
+        "playerNum": 2,
+        "carriedMoney": 1,
+        "carriedWater": 2,
+        "both": true
+    },
+    {
+        "id": 34,
+        "type": "WELL",
+        "playerNum": 2,
+        "carriedMoney": 2,
+        "carriedWater": 1,
+        "both": true
+    },
+    {
+        "id": 35,
+        "type": "WELL",
+        "playerNum": 2,
+        "carriedMoney": 2,
+        "carriedWater": 2,
+        "both": false
+    },
+    {
+        "id": 36,
+        "type": "WELL",
+        "playerNum": 3,
+        "carriedMoney": 2,
+        "carriedWater": 2,
+        "both": false
+    },
+    {
+        "id": 37,
+        "type": "WELL",
+        "playerNum": 3,
+        "carriedMoney": 1,
+        "carriedWater": 2,
+        "both": true
+    },
+    {
+        "id": 38,
+        "type": "WELL",
+        "playerNum": 3,
+        "carriedMoney": 2,
+        "carriedWater": 1,
+        "both": true
+    },
+    {
+        "id": 39,
+        "type": "WELL",
+        "playerNum": 4,
+        "carriedMoney": 2,
+        "carriedWater": 1,
+        "both": true
+    },
+    {
+        "id": 40,
+        "type": "WELL",
+        "playerNum": 4,
+        "carriedMoney": 2,
+        "carriedWater": 2,
+        "both": false
+    },
+    {
+        "id": 41,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 2,
+        "objectiveObject": "WELL"
+    },
+    {
+        "id": 42,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 4,
+        "objectiveObject": "BIGKOI"
+    },
+    {
+        "id": 43,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 3,
+        "objectiveObject": "MEDIUMKOI"
+    },
+    {
+        "id": 44,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 2,
+        "objectiveObject": "SMALLKOI"
+    },
+    {
+        "id": 45,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 2,
+        "objectiveObject": "LANTERN"
+    },
+    {
+        "id": 46,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 2,
+        "objectiveObject": "LILY"
+    },
+    {
+        "id": 47,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 3,
+        "objectiveObject": "MARKET"
+    },
+    {
+        "id": 48,
+        "type": "SCROLL",
+        "playerNum": 2,
+        "pointsPerObject": 3,
+        "objectiveObject": "WAREHOUSE"
+    }
+]
