@@ -11,5 +11,10 @@ public class MarketCard extends Card {
     public void activate(CardEffects target) {
         target.goToMarketWithDiscount(discount);
     }
+
+    @Override
+    public String describe() {
+        return "Market: koi discount " + discount;
+    }
     
 }

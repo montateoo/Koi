@@ -1,6 +1,8 @@
 package game;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Tile {
@@ -8,7 +10,6 @@ public class Tile {
     private static final AtomicInteger count = new AtomicInteger(0); 
     private Integer tileID; //per tessere composte da piuò parti aggrego unità con lo stesso id
     private TileType tileType;
-    private ArrayList<Integer> corners; //sono esagoni quindi a partire dal lato alto in senso orario 0,1,2,3,4,5
     private int spaceOccupied;
 
 	public Tile(TileType tileType) {
@@ -16,69 +17,28 @@ public class Tile {
         this.tileID = count.incrementAndGet();
 
         switch (tileType){
-            case TileType.WATER:
-                corners = new ArrayList<>(6);
-                corners.addAll(null);
+            case WATER:
                 this.spaceOccupied = 1;
                 break;
-            case TileType.LEAF:
-                corners = new ArrayList<>(6);
-                corners.addAll(null);
+            case LEAF:
                 this.spaceOccupied = 1;
-
                 break;
-            case TileType.LILY:
-                corners = new ArrayList<>(6);
-                corners.addAll(null);
+            case LILY:
                 this.spaceOccupied = 0;
                 break;
-            case TileType.BORDER:
-                corners = new ArrayList<>(18);
-                corners.addAll(null);
-                corners.add(2,this.tileID);
-                corners.add(4,this.tileID);
-                corners.add(11,this.tileID);
-                corners.add(13,this.tileID);
+            case BORDER:
                 this.spaceOccupied = 3;
                 break;
-            case TileType.SMALLKOI:
-                corners = new ArrayList<>(6);
-                corners.addAll(null);
+            case SMALLKOI:
                 this.spaceOccupied = 1;
                 break;
-            case TileType.MEDIUMKOI:
-                corners = new ArrayList<>(12);
-                corners.addAll(null);
-                corners.add(3,this.tileID);
-                corners.add(6,this.tileID);
+            case MEDIUMKOI:
                 this.spaceOccupied = 2;
                 break;
-            case TileType.BIGKOI:
-                corners = new ArrayList<>(18);
-                corners.addAll(null);
-                corners.add(3,this.tileID);
-                corners.add(4,this.tileID);
-                corners.add(6,this.tileID);
-                corners.add(11,this.tileID);
-                corners.add(12,this.tileID);
-                corners.add(13,this.tileID);
+            case BIGKOI:
                 this.spaceOccupied = 3;
                 break;
-            case TileType.WATERSOURCE:
-                corners = new ArrayList<>(30);
-                corners.addAll(null);
-                corners.add(1,this.tileID);
-                corners.add(2,this.tileID);
-                corners.add(4,this.tileID);
-                corners.add(5,this.tileID);
-                corners.add(9,this.tileID);
-                corners.add(10,this.tileID);
-                corners.add(11,this.tileID);
-                corners.add(17,this.tileID);
-                corners.add(18,this.tileID);
-                corners.add(19,this.tileID);
-                corners.add(26,this.tileID);
-                corners.add(27,this.tileID);
+            case WATERSOURCE:
                 this.spaceOccupied = 3;
                 break;
             default:
@@ -86,8 +46,16 @@ public class Tile {
         }
 	}
 
+    public int getTileID() {
+        return tileID;
+    }
+
     public int getSpaceOccupied() {
         return spaceOccupied;
+    }
+
+    public TileType getTileType() {
+        return tileType;
     }
     
 }

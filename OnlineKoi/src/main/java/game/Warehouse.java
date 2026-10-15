@@ -73,7 +73,7 @@ public class Warehouse {
        
         ArrayList<Tile> toShip = new ArrayList<>();
 
-        for(int j=0; j<=i; j++)
+        for(int j=0; j<i; j++)
         {
             if(countWater>0){
               countWater--;
@@ -81,8 +81,82 @@ public class Warehouse {
             }          
         }
         return toShip;
-    }   
-        
-   
+    }
+
+    public ArrayList<Tile> takeBorder(int i) {
+        ArrayList<Tile> toShip = new ArrayList<>();
+
+        for(int j=0; j<i; j++)
+        {
+            if(countBorder>0){
+              countBorder--;
+              toShip.add(new Tile(TileType.BORDER));
+            }          
+        }
+        return toShip;
+    }
+
+    public ArrayList<Tile> takeLeaf(int i) {
+        ArrayList<Tile> toShip = new ArrayList<>();
+
+        for(int j=0; j<i; j++)
+        {
+            if(countLeaf>0){
+              countLeaf--;
+              toShip.add(new Tile(TileType.LEAF));
+            }          
+        }
+        return toShip;
+    }
     
+    public ArrayList<Tile> takeLily(int i) {
+        ArrayList<Tile> toShip = new ArrayList<>();
+
+        for(int j=0; j<i; j++)
+        {
+            if(countLily>0){
+              countLily--;
+              toShip.add(new Tile(TileType.LILY));
+            }          
+        }
+        return toShip;
+    }
+
+    public ArrayList<Tile> takeLantern(int i) {
+        ArrayList<Tile> toShip = new ArrayList<>();
+
+        for(int j=0; j<i; j++)
+        {
+            if(countLanterns>0){
+              countLanterns--;
+              toShip.add(new Tile(TileType.LANTERN));
+            }          
+        }
+        return toShip;
+    } 
+    
+    public void takeLuckyCard() {
+        countLuckyCards--;
+    }
+
+    public void giveBackLuckyCard() {
+        countLuckyCards++;
+    }  
+
+    public boolean has(TileType tileType) {
+        switch (tileType) {
+            case WATER:
+                return countWater > 0;
+            case LEAF:
+                return countLeaf > 0;
+            case LILY:
+                return countLily > 0;
+            case BORDER:
+                return countBorder > 0;
+            case LANTERN:
+                return countLanterns > 0;
+            default:
+                return false;   // sorgente e carpe non stanno in questa riserva
+        }
+    }
 }

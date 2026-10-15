@@ -9,5 +9,10 @@ public class ScrollCard extends Card {
         this.pointsPerObject=pointsPerObject;
         this.objectiveObject=objectiveObject;
     }
+
+    @Override
+    public String describe() {
+        return "Scroll: " + pointsPerObject + " pts per " + objectiveObject;
+    }
     
 }

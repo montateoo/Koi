@@ -3,103 +3,120 @@
         "id": 1,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+        "allowedActions": ["PLACEKOI", "MOVEKOI"],
+        "capacity": 1
     },
     {
         "id": 2,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+        "allowedActions": ["PLACEKOI", "MOVEKOI"],
+        "capacity": 1
     },
     {
         "id": 3,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+        "allowedActions": ["PLACEKOI", "MOVEKOI"],
+        "capacity": 1
     },
     {
         "id": 4,
         "type": "HELPER",
         "playerNum": 3,
-        "allowedActions": ["PLACEKOI", "MOVEKOI"]
+        "allowedActions": ["PLACEKOI", "MOVEKOI"],
+        "capacity": 1
     },
     {
         "id": 5,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"],
+        "capacity": 1
     },
     {
         "id": 6,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"],
+        "capacity": 1
     },
     {
         "id": 7,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"],
+        "capacity": 1
     },
     {
         "id": 8,
         "type": "HELPER",
         "playerNum": 3,
-        "allowedActions": ["PLACEBORDER", "PLACELANTERN"]
+        "allowedActions": ["PLACEBORDER", "PLACELANTERN"],
+        "capacity": 1
     },
     {
         "id": 9,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+        "allowedActions": ["PLACELEAFS", "PLACELILY"],
+        "capacity": 1
     },
     {
         "id": 10,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+        "allowedActions": ["PLACELEAFS", "PLACELILY"],
+        "capacity": 1
     },
     {
         "id": 11,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+        "allowedActions": ["PLACELEAFS", "PLACELILY"],
+        "capacity": 1
     },
     {
         "id": 12,
         "type": "HELPER",
         "playerNum": 3,
-        "allowedActions": ["PLACELEAFS", "PLACELILY"]
+        "allowedActions": ["PLACELEAFS", "PLACELILY"],
+        "capacity": 1
     },
     {
         "id": 13,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEWATER"]
+        "allowedActions": ["PLACEWATER"],
+        "capacity": 2
     },
     {
         "id": 14,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEWATER"]
+        "allowedActions": ["PLACEWATER"],
+        "capacity": 2
     },
     {
         "id": 15,
         "type": "HELPER",
         "playerNum": 2,
-        "allowedActions": ["PLACEWATER"]
+        "allowedActions": ["PLACEWATER"],
+        "capacity": 2
     },
     {
         "id": 16,
         "type": "HELPER",
         "playerNum": 3,
-        "allowedActions": ["PLACEWATER"]
+        "allowedActions": ["PLACEWATER"],
+        "capacity": 2
     },
     {
         "id": 17,
         "type": "HELPER",
         "playerNum": 4,
-        "allowedActions": ["PLACEWATER"]
+        "allowedActions": ["PLACEWATER"],
+        "capacity": 2
     },
     {
         "id": 18,

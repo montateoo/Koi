@@ -1,0 +1,102 @@
+/* stile della GUI: carta color crema, inchiostro scuro, accenti vermiglio e oro */
+
+.root {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 13px;
+    -fx-text-fill: #2b2622;
+    -fx-background-color: #f6efdc;
+    -fx-focus-color: #d4a13a;
+    -fx-faint-focus-color: transparent;
+}
+
+.label {
+    -fx-text-fill: #2b2622;
+}
+
+.button {
+    -fx-background-color: #2b2622;
+    -fx-text-fill: #f6efdc;
+    -fx-background-radius: 3;
+    -fx-padding: 7 18;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #c8341f;
+}
+
+.button:pressed {
+    -fx-background-color: #8e1f10;
+}
+
+.button.ghost {
+    -fx-background-color: transparent;
+    -fx-border-color: #2b2622;
+    -fx-border-radius: 3;
+    -fx-text-fill: #2b2622;
+}
+
+.button.ghost:hover {
+    -fx-background-color: rgba(200, 52, 31, 0.12);
+}
+
+.text-field, .list-view, .text-area {
+    -fx-background-color: #fbf7ec;
+    -fx-border-color: #c9b99a;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.text-area .content {
+    -fx-background-color: #fbf7ec;
+}
+
+.list-cell {
+    -fx-background-color: #fbf7ec;
+    -fx-text-fill: #2b2622;
+    -fx-padding: 6 8;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: #efe4c8;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #c8341f;
+    -fx-text-fill: #fbf7ec;
+}
+
+.scroll-pane, .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.panel {
+    -fx-background-color: rgba(251, 247, 236, 0.93);
+    -fx-background-radius: 8;
+    -fx-border-color: #c9b99a;
+    -fx-border-radius: 8;
+    -fx-padding: 14;
+    -fx-effect: dropshadow(gaussian, rgba(60, 40, 20, 0.22), 14, 0.15, 0, 4);
+}
+
+.panel-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #6b4a2e;
+}
+
+.muted {
+    -fx-text-fill: #7a6c5a;
+}
+
+.hint {
+    -fx-text-fill: #2e7f8f;
+    -fx-font-size: 14px;
+    -fx-font-style: italic;
+}
+
+.status {
+    -fx-font-size: 15px;
+}

@@ -13,7 +13,7 @@ public class RainCard extends Card {
 
         this.rainTiles = new ArrayList<>();
 
-        for(int i = 0; i<=rainTiles.size(); i++){
+        for(int i = 0; i<rainTiles.size(); i++){
             this.rainTiles.add(new Tile(rainTiles.get(i)));
         }
         
@@ -21,6 +21,15 @@ public class RainCard extends Card {
 
     public void activate(CardEffects target) {
         target.placeRainTiles(rainTiles);
+    }
+
+    @Override
+    public String describe() {
+        ArrayList<TileType> types = new ArrayList<>();
+        for (Tile tile : rainTiles) {
+            types.add(tile.getTileType());
+        }
+        return "Rain: " + types;
     }
     
 }

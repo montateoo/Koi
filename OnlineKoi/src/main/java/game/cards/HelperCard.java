@@ -2,30 +2,43 @@ package game.cards;
 
 import java.util.ArrayList;
 
-public class HelperCard extends Card {
+import game.Worker;
+
+public class HelperCard extends Card implements Worker {
     private ArrayList<Actions> allowedActions;
-    private boolean tired; //true if has already worked or false if not
+    private final int capacity;
+    private int usesLeft;
 
-    
-
-    public HelperCard(int id, CardType type, int playerNum, ArrayList<Actions> allowedActions){
+    public HelperCard(int id, CardType type, int playerNum, ArrayList<Actions> allowedActions, int capacity){
         super (id, type, playerNum);
-        this.allowedActions=allowedActions;
-        this.tired=false;
+        this.allowedActions = allowedActions;
+        this.capacity = capacity;
+        this.usesLeft = capacity;
     }
 
-    public boolean canWork()
-    {
-        return !tired;
+    @Override
+    public boolean canDo(Actions requiredAction) {
+        return usesLeft > 0 && allowedActions.contains(requiredAction);
     }
 
-    public void hasWorked()
-    {
-        tired = true;
+    @Override
+    public boolean isBusy() {
+        return usesLeft > 0 && usesLeft < capacity;
     }
 
-    public void returnOperational()
-    {
-        tired = false;
+    @Override
+    public void work(Actions action) {
+        usesLeft--;
     }
+
+    @Override
+    public void rest() {
+        usesLeft = capacity;
+    }
+
+    @Override
+    public String describe() {
+        return "Helper: " + allowedActions + " usesLeft: " + usesLeft + "/" + capacity;
+    }
+
 }

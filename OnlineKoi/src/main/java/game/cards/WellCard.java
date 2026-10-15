@@ -20,4 +20,9 @@ public class WellCard extends Card {
             target.giveWellChoice(carriedMoney,carriedWater);
         }
     }
+
+    @Override
+    public String describe() {
+        return "Well: " + carriedMoney + " coins " + (both ? "and " : "or ") + carriedWater + " water";
+    }
 }

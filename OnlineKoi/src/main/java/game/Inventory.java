@@ -1,6 +1,8 @@
 package game;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import game.cards.*;
 
@@ -26,12 +28,16 @@ public class Inventory{
 
     public void addTile(ArrayList<Tile> toShip) {
         for(Tile newTile : toShip){
-            if(spaceLeft - newTile.getSpaceOccupied() >= 0){
-                myTiles.add(newTile);
-                spaceLeft = spaceLeft - newTile.getSpaceOccupied();
-            }else{
+            addTile(newTile);
+        }
+    }
+
+    public void addTile(Tile newTile) {
+        if(spaceLeft - newTile.getSpaceOccupied() >= 0){
+            myTiles.add(newTile);
+            spaceLeft = spaceLeft - newTile.getSpaceOccupied();
+        }else{
                 //TODO gestire lo scarto delle tessere
-            }
         }
     }
 
@@ -57,5 +63,81 @@ public class Inventory{
 	public void incrementStorage(int space) {
         maxSpace = maxSpace + space;
         spaceLeft = spaceLeft + space;
+    }
+
+    public int getCoins() {
+        return coins;
+    }
+
+    public int getLuckyCards() {
+        return LuckyCards;
+    }
+
+    public int getMaxSpace() {
+        return maxSpace;
+    }
+
+    public int getSpaceLeft() {
+        return spaceLeft;
+    }
+
+    public List<Tile> getTiles() {
+        return Collections.unmodifiableList(myTiles);
+    }
+
+    public List<HelperCard> getHelpers() {
+        return Collections.unmodifiableList(myWorkers);
+    }
+
+    public List<Card> getCards() {
+        return Collections.unmodifiableList(myCards);
+    }
+
+    public List<ScrollCard> getScrolls() {
+        return Collections.unmodifiableList(myScrolls);
+    }
+
+    public void takeMoney(int cost) {
+        coins = coins - cost;  
+    }
+
+    public Tile retrieveTile(TileType targetTile) {
+
+        int i = 0;
+        for(Tile t: myTiles){
+            if(t.getTileType()==targetTile){
+                Tile tile = myTiles.remove(i);
+                spaceLeft = spaceLeft + tile.getSpaceOccupied();
+                return tile;
+            }
+            i++;
+        }
+
+        return null; //TODO molto brutto ma per ora funziona
+    }
+
+    public HelperCard searchAmongHelpers(Actions requiredAction) {
+        for(HelperCard helper: myWorkers){
+            if(helper.canDo(requiredAction)){
+                return helper;
+            }
+        }
+
+        return null; //TODO fare di meglio
+    }
+
+    public void restAllWorkers() {
+        for(HelperCard worker: myWorkers){
+            worker.rest();
+        }
+    }
+
+    public boolean hasTile(TileType targetType) {
+        for(Tile t: myTiles){
+            if(t.getTileType() == targetType){
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -28,6 +28,11 @@ public class Card {
         // di base non fa nulla
     }
 
+    // descrizione leggibile mostrata ai giocatori, ogni tipo di carta la ridefinisce
+    public String describe() {
+        return type.toString();
+    }
+
     public String toString(){
         return "card" + id + " Type: " + type.toString() + " Pnum: " + playerNum;
     }

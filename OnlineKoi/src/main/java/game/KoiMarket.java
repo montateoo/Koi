@@ -17,6 +17,18 @@ public class KoiMarket {
     private final int mediumKoiCost = 2;
     private final int bigKoiCost = 3;
 
+    public int getSmallKoiCost() {
+        return smallKoiCost;
+    }
+
+    public int getMediumKoiCost() {
+        return mediumKoiCost;
+    }
+
+    public int getBigKoiCost() {
+        return bigKoiCost;
+    }
+
     private ArrayList<KoiCarp> smallKoiCarps;
     private ArrayList<KoiCarp> mediumKoiCarps;
     private ArrayList<KoiCarp> bigKoiCarps;
@@ -42,15 +54,15 @@ public class KoiMarket {
 
                 switch (carpType){
 
-                    case TileType.BIGKOI:
+                    case BIGKOI:
                         bigKoiCarps.add(new KoiCarp(id, carpType));
                         break;
 
-                    case TileType.MEDIUMKOI:
+                    case MEDIUMKOI:
                         mediumKoiCarps.add(new KoiCarp(id, carpType));
                         break;
 
-                    case TileType.SMALLKOI:
+                    case SMALLKOI:
                         smallKoiCarps.add(new KoiCarp(id, carpType));
                         break;
 
@@ -100,6 +112,18 @@ public class KoiMarket {
             bigKoiCarps.removeLast();
         }
         
+    }
+
+    public int getSmallKoiLeft() {
+        return smallKoiCarps.size();
+    }
+
+    public int getMediumKoiLeft() {
+        return mediumKoiCarps.size();
+    }
+
+    public int getBigKoiLeft() {
+        return bigKoiCarps.size();
     }
 
     public Tile takeSmallKoi() {

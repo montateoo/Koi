@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -20,6 +21,13 @@ public class Board {
     private ArrayList<Card> drawableCards;
     private ArrayList<Card> deckOfCards;
     final int boardSize = 5;
+    final int firstCardCost = 1;
+    final int thirdBonusMoney = 2;
+    final int thirdBonusWater = 1;
+    final int fourthBonusMoney = 1;
+    final int fourthBonusWater = 2;
+    final int fifthBonusBorder = 1;
+    final int fifthBonusLeaf = 1;
     private BoardListener listener;
 
     public Board(){
@@ -29,6 +37,10 @@ public class Board {
 
     public void setListener(BoardListener listener) {
         this.listener = listener;
+    }
+
+    public List<Card> getDrawableCards() {
+        return Collections.unmodifiableList(drawableCards);
     }
 
     private void loadCards(int pNum){
@@ -49,25 +61,26 @@ public class Board {
 
                     switch (cardType){
 
-                        case CardType.HELPER:
+                        case HELPER:
 
                             ArrayList<Actions> allowedActions = new ArrayList<>();
                             for (Object value : (JSONArray) newCard.get("allowedActions")) {
-                            allowedActions.add(Enum.valueOf(Actions.class, (String) value));
+                                allowedActions.add(Enum.valueOf(Actions.class, (String) value));
                             }
+                            int rawCapacity = ((Number) newCard.get("capacity")).intValue();
 
-                            deckOfCards.add(new HelperCard(id, cardType, playerNum, allowedActions));
+                            deckOfCards.add(new HelperCard(id, cardType, playerNum, allowedActions, rawCapacity));
                             break;
 
-                        case CardType.WAREHOUSE:
+                        case WAREHOUSE:
                             deckOfCards.add(new WarehouseCard(id, cardType, playerNum, ((Number) newCard.get("additionalSpace")).intValue()));
                             break;
 
-                        case CardType.MARKET:
+                        case MARKET:
                             deckOfCards.add(new MarketCard(id, cardType, playerNum, ((Number) newCard.get("discount")).intValue()));
                             break;
 
-                        case CardType.RAIN:
+                        case RAIN:
 
                             ArrayList<TileType> rainTiles = new ArrayList<>();
                             for (Object value : (JSONArray) newCard.get("rainTiles")) {
@@ -77,11 +90,11 @@ public class Board {
                             deckOfCards.add(new RainCard(id, cardType, playerNum, rainTiles));
                             break;
 
-                        case CardType.WELL:
+                        case WELL:
                             deckOfCards.add(new WellCard(id, cardType, playerNum, ((Number) newCard.get("carriedMoney")).intValue(), ((Number)newCard.get("carriedWater")).intValue(), ((Boolean)newCard.get("both"))));
                             break;
 
-                        case CardType.SCROLL:
+                        case SCROLL:
                             deckOfCards.add(new ScrollCard(id, cardType, playerNum, ((Number) newCard.get("pointsPerObject")).intValue(), Enum.valueOf( ScrollObjective.class , (String)newCard.get("objectiveObject"))));
                             break;
 
@@ -91,13 +104,10 @@ public class Board {
                 }
             }
         }catch (FileNotFoundException e) {
-        // TODO Auto-generated catch block
             e.printStackTrace();
         } catch (IOException e) {
-        // TODO Auto-generated catch block
             e.printStackTrace();
         } catch (ParseException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
@@ -136,13 +146,13 @@ public class Board {
 
     private void drawEffect(int position) {
         if(position==0){
-            listener.applyBoardEffect(position);
+            listener.playerHasToPay(firstCardCost);
         }else if(position==2){
-            listener.applyBoardEffect(position);
+            listener.playerGiveBonusMoneyWater(thirdBonusMoney,thirdBonusWater);
         }else if(position==3){
-            listener.applyBoardEffect(position); 
+            listener.playerAskBonusOrMarket(fourthBonusMoney,fourthBonusWater);
         }else if(position==4){
-            listener.applyBoardEffect(position); 
+            listener.playerAskBorderOrLeaf(fifthBonusBorder,fifthBonusLeaf); 
         }
     }
 

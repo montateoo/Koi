@@ -11,4 +11,9 @@ public class WarehouseCard extends Card {
     public void activate(CardEffects target) {
         target.addStorage(additionalSpace);
     }
+
+    @Override
+    public String describe() {
+        return "Warehouse: +" + additionalSpace + " storage";
+    }
 }
