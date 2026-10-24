@@ -1,7 +1,10 @@
 package game;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import game.cards.*;
 import game.listeners.PlayerListener;
@@ -19,6 +22,7 @@ public class Player implements Worker{
     private final int waterPlacementUses = 2; //special rule for water tiles
     private final int maxActionsPerTurn = 1;
     private Actions currentAction = null;   // l'azione che sta facendo in questo turno
+    private final List<Tile> objectiveTiles = new ArrayList<>();
 
 	public Player(String playerName){
         this.playerName = playerName;
@@ -146,9 +150,25 @@ public class Player implements Worker{
         myPond.placeKoi(tile, anchor, rotation);
     }
 
-    public void moveKoi() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'moveKoi'");
+    public void moveKoi(Actions action, int koiId, HexPosition anchor, int rotation) {
+        findWorker(action).work(action);
+        myPond.moveKoi(koiId, anchor, rotation);
+    }
+
+    public boolean canMoveKoi(int koiId, HexPosition anchor, int rotation) {
+        return myPond.canMoveKoi(koiId, anchor, rotation);
+    }
+
+    public boolean isKoiAt(int koiId, HexPosition anchor, int rotation) {
+        return myPond.isKoiAt(koiId, anchor, rotation);
+    }
+
+    public Set<Integer> koiIds() {
+        return myPond.koiIds();
+    }
+
+    public Map<HexPosition, List<Integer>> koiMoves(int koiId) {
+        return myPond.koiMoves(koiId);
     }
 
     public boolean placeTile(TileType tileType, Actions action, HexPosition position) {
@@ -255,5 +275,46 @@ public class Player implements Worker{
     public boolean hasWorkerFor(Actions action) {
         return findWorker(action) != null;
     }
+
+    public int countCards(CardType type) {
+        return inventory.countCards(type);
+    }
+
+    public int countKoi() {
+        return myPond.countKoi();
+    }
+
+    public int countTops(TileType type) {
+        return myPond.countTops(type);
+    }
+
+    public int countFreeWater() {
+        return myPond.countFreeWater();
+    }
+
+    public boolean hasAdjacentTops(TileType type) {
+        return myPond.hasAdjacentTops(type);
+    }
+
+    public void addObjective(Tile tile) {
+        objectiveTiles.add(tile);
+    }
+
+    public List<Tile> getObjectiveTiles() {
+        return Collections.unmodifiableList(objectiveTiles);
+    }
+
+    public boolean hasShape(int[][] shape, boolean sourceAllowed) {
+        return !myPond.findShape(shape, sourceAllowed).isEmpty();
+    }
+
+    public int countBase(TileType type) {
+        return myPond.countBase(type);
+    }
+
+    public boolean hasKoi(int koiId) {
+        return !(myPond.findKoi(koiId).isEmpty());
+    }
+
 
 }

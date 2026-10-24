@@ -140,4 +140,20 @@ public class Inventory{
         }
         return false;
     }
+
+    public int countCards(CardType type) {
+        if (type == CardType.SCROLL) {
+            return myScrolls.size();
+        }
+        if (type == CardType.HELPER) {
+            return myWorkers.size();
+        }
+        int count = 0;
+        for (Card c : myCards) {
+            if (c.getType() == type) {
+                count++;
+            }
+        }
+        return count;
+    }
 }

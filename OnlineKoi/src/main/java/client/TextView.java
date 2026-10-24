@@ -94,6 +94,12 @@ public class TextView implements View {
                     if (koi != null) {
                         controller.placeKoi(koi[0], koi[1], koi[2], koi[3]);
                     }
+                    break;
+                case "move":
+                    int[] moveKoi = parseNumbers(argument, "move <koi id> <q> <r> <rotation>", 4);
+                    if (moveKoi != null) {
+                        controller.moveKoi(moveKoi[0], moveKoi[1], moveKoi[2], moveKoi[3]);
+                    }
                     break;                 
                 case "end":
                     controller.endTurn();
@@ -127,7 +133,7 @@ public class TextView implements View {
     }
 
     private void printHelp() {
-        System.out.println("Commands: rooms | create <name> | join <room id> | start | draw <position> | choose <number> | water <q> <r> | leaf  <q> <r> | lily  <q> <r> | border <q> <r> <rotation> | lantern <q> <r> | koi <type> <q> <r> <rotation> | end | quit | help");
+        System.out.println("Commands: rooms | create <name> | join <room id> | start | draw <position> | choose <number> | water <q> <r> | leaf  <q> <r> | lily  <q> <r> | border <q> <r> <rotation> | lantern <q> <r> | koi <type> <q> <r> <rotation> | move <koi id> <q> <r> <rotation> | end | quit | help");
     }
 
     @Override

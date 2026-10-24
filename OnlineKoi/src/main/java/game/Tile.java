@@ -1,8 +1,5 @@
 package game;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Tile {
@@ -42,6 +39,7 @@ public class Tile {
                 this.spaceOccupied = 3;
                 break;
             default:
+                this.spaceOccupied = 0;
                 break;           
         }
 	}

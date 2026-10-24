@@ -14,6 +14,7 @@ import javafx.scene.shape.Arc;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Ellipse;
+import javafx.scene.shape.Line;
 import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
@@ -44,6 +45,34 @@ final class KoiArt {
         Color deep = source ? Color.web("#3fa6b6") : Theme.TEAL;
         return new RadialGradient(0, 0, cx - size * 0.35, cy - size * 0.35, size * 1.6, false, CycleMethod.NO_CYCLE,
                 new Stop(0, light), new Stop(1, deep));
+    }
+
+    // prato del salice piangente
+    static Paint grassFill(double cx, double cy, double size) {
+        return new RadialGradient(0, 0, cx - size * 0.3, cy - size * 0.3, size * 1.5, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#a6d06a")), new Stop(1, Color.web("#5e8f2f")));
+    }
+
+    // ciuffi d'erba e qualche fiorellino giallo, sparsi in modo diverso per ogni esagono
+    static Group grassTufts(double cx, double cy, double size, int seed) {
+        Group tufts = new Group();
+        double[][] spots = {{-0.4, -0.25}, {0.3, -0.4}, {0.4, 0.2}, {-0.2, 0.4}, {0.0, -0.05}};
+        for (int i = 0; i < spots.length; i++) {
+            double x = cx + spots[(i + seed) % spots.length][0] * size;
+            double y = cy + spots[(i + seed) % spots.length][1] * size;
+            if (i % 2 == 0) {
+                Circle flower = new Circle(x, y, Math.max(1, size * 0.05), Color.web("#f3d04a"));
+                tufts.getChildren().add(flower);
+            } else {
+                for (int blade = -1; blade <= 1; blade++) {
+                    Line line = new Line(x, y, x + blade * size * 0.06, y - size * 0.12);
+                    line.setStroke(Color.web("#3f6e1f"));
+                    line.setStrokeWidth(Math.max(1, size * 0.03));
+                    tufts.getChildren().add(line);
+                }
+            }
+        }
+        return tufts;
     }
 
     static Paint stoneFill(double cx, double cy, double size) {
@@ -150,8 +179,30 @@ final class KoiArt {
 
     // ---------------------------------------------------------------- ninfea
 
+    // tessera Percorso: tre pietre piatte da guado, centrate in (0, 0)
+    static Group pathStones(double radius) {
+        Group stones = new Group();
+        double[][] layout = {{-0.45, 0.28, 0.42}, {0.08, -0.05, 0.5}, {0.5, -0.4, 0.36}};   // x, y, raggio
+        for (double[] stone : layout) {
+            Ellipse rock = new Ellipse(radius * stone[0], radius * stone[1], radius * stone[2], radius * stone[2] * 0.72);
+            rock.setFill(new RadialGradient(0, 0, radius * stone[0] - radius * 0.1, radius * stone[1] - radius * 0.1,
+                    radius * stone[2], false, CycleMethod.NO_CYCLE,
+                    new Stop(0, Color.web("#e6e1d6")), new Stop(1, Color.web("#9b958a"))));
+            rock.setStroke(Color.web("#6f6a60"));
+            rock.setStrokeWidth(1.2);
+            stones.getChildren().add(rock);
+        }
+        stones.setEffect(new DropShadow(radius * 0.2, Color.color(0, 0.15, 0.2, 0.4)));
+        return stones;
+    }
+
     // ninfea su una foglia rotonda con la tacca, centrata in (0, 0)
     static Group lily(double radius) {
+        return lily(radius, Color.web("#ef6f9a"), Color.web("#c2185b"));
+    }
+
+    // stessa ninfea con i petali sfumati verso "tip" (la Ninfea viola degli obiettivi)
+    static Group lily(double radius, Color tip, Color outline) {
         Arc pad = new Arc(0, 0, radius, radius, 25, 310);
         pad.setType(ArcType.ROUND);
         pad.setFill(new RadialGradient(0, 0, 0, 0, radius, false, CycleMethod.NO_CYCLE,
@@ -160,11 +211,11 @@ final class KoiArt {
 
         Group flower = new Group();
         Paint petalFill = new LinearGradient(0, 0, 1, 0, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#fff0f5")), new Stop(1, Color.web("#ef6f9a")));
+                new Stop(0, Color.web("#fff0f5")), new Stop(1, tip));
         for (int i = 0; i < 8; i++) {
             Ellipse petal = new Ellipse(radius * 0.32, 0, radius * 0.33, radius * 0.13);
             petal.setFill(petalFill);
-            petal.setStroke(Color.web("#c2185b", 0.5));
+            petal.setStroke(outline.deriveColor(0, 1, 1, 0.5));
             petal.getTransforms().add(new Rotate(i * 45 + 22, 0, 0));
             flower.getChildren().add(petal);
         }

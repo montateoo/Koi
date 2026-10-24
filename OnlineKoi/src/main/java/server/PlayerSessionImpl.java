@@ -71,8 +71,8 @@ public class PlayerSessionImpl extends UnicastRemoteObject implements PlayerSess
     }
 
     @Override
-    public void moveKoi() throws RemoteException {
-        roomController.moveKoi(player);
+    public void moveKoi(int koiId, int q, int r, int angle) throws RemoteException {
+        roomController.moveKoi(player, koiId, q, r, angle);
     }
 
     @Override

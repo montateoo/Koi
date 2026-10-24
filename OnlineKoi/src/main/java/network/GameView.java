@@ -19,13 +19,15 @@ public record GameView(
         List<String> options,
         Map<String, List<HexCoord>> playablePositions,
         Map<String, Map<HexCoord, List<Integer>>> rotations,
-        boolean canDraw) implements Serializable {
+        boolean canDraw,
+        List<ObjectiveView> objectives) implements Serializable {
 
 
     public GameView {
         board = List.copyOf(board);
         players = List.copyOf(players);
         options = options == null ? List.of() : List.copyOf(options);
+        objectives = objectives == null ? List.of() : List.copyOf(objectives);
 
         Map<String, List<HexCoord>> copy = new LinkedHashMap<>();
         if (playablePositions != null) {
@@ -57,5 +59,20 @@ public record GameView(
 
     public boolean isMyTurn() {
         return viewer != null && viewer.equals(activePlayer);
+    }
+
+    // le destinazioni di una carpa gia' nello stagno stanno in playablePositions e rotations sotto la chiave "MOVE:<id>"
+    private static final String MOVE_PREFIX = "MOVE:";
+
+    public static String moveKey(int koiId) {
+        return MOVE_PREFIX + koiId;
+    }
+
+    public static boolean isMoveKey(String key) {
+        return key != null && key.startsWith(MOVE_PREFIX);
+    }
+
+    public static int koiIdOf(String moveKey) {
+        return Integer.parseInt(moveKey.substring(MOVE_PREFIX.length()));
     }
 }

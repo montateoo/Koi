@@ -13,6 +13,7 @@ import network.CellView;
 import network.ClientCallback;
 import network.GameView;
 import network.HexCoord;
+import network.ObjectiveView;
 import network.PlayerView;
 import game.Cell;
 import game.GameRoom;
@@ -25,6 +26,8 @@ import game.PlayerState;
 import game.Tile;
 import game.TileType;
 import game.cards.Actions;
+import game.objectives.Objective;
+import game.objectives.ObjectiveType;
 import game.cards.Card;
 
 
@@ -36,7 +39,9 @@ public class RoomController {
     private GameState gameState;
     private LinkedHashMap<Player, ClientCallback> joinedPlayers;
     private final Set<Player> readyPlayers = new HashSet<>();
-    
+    private Player endingTurn;   // giocatore che ha premuto End ma deve ancora rispondere sugli obiettivi
+
+
     public RoomController(String id, String roomName){
         this.gameId = id;
         this.roomName = roomName;
@@ -164,11 +169,38 @@ public class RoomController {
             }
         }
 
+        // carpe gia' nello stagno: le destinazioni dipendono dalla carpa (gli esagoni che lascia tornano liberi)
+        if (viewer == active && pending == null) {
+            for (int koiId : viewer.koiIds()) {
+                List<HexCoord> anchors = new ArrayList<>();
+                Map<HexCoord, List<Integer>> byAnchor = new LinkedHashMap<>();
+                for (Map.Entry<HexPosition, List<Integer>> move : viewer.koiMoves(koiId).entrySet()) {
+                    HexCoord anchor = new HexCoord(move.getKey().q(), move.getKey().r());
+                    anchors.add(anchor);
+                    byAnchor.put(anchor, move.getValue());
+                }
+                if (!anchors.isEmpty()) {
+                    playable.put(GameView.moveKey(koiId), anchors);
+                    rotations.put(GameView.moveKey(koiId), byAnchor);
+                }
+            }
+        }
+
         boolean canDraw = viewer == active && pending == null && viewer.getState() == PlayerState.IDLE;
+
+        // i tre obiettivi sul tavolo; "claimable" solo per quelli che si reclamano a fine turno (non il Percorso)
+        List<ObjectiveView> objectives = new ArrayList<>();
+        for (Objective objective : game.getObjectives()) {
+            ObjectiveType type = objective.getObjectiveType();
+            TileType preview = objective.previewTileType(viewer);
+            objectives.add(new ObjectiveView(type.name(), type.displayName(), type.requirement(), type.cost(),
+                    objective.tilesLeft(), preview == null ? null : preview.name(),
+                    type != ObjectiveType.PATH && objective.canBeClaimedBy(viewer)));
+        }
 
         return new GameView(viewer.getName(), active == null ? null : active.getName(), board,
             market.getSmallKoiLeft(), market.getMediumKoiLeft(), market.getBigKoiLeft(), players,
-            question, options, playable, rotations, canDraw);
+            question, options, playable, rotations, canDraw, objectives);
     }
 
     private PlayerView buildPlayerView(Player player) {
@@ -247,6 +279,11 @@ public class RoomController {
             if(player.equals(choice.player())){
                 if((option>=0) &&(choice.options().size()>option)){
                     game.answerChoice(option);
+                    if (player.equals(endingTurn) && game.getPendingChoice() == null) {
+                        endingTurn = null;
+                        finishTurn(player);      // ultima risposta data: il turno passa
+                        return;
+                    }
                     sendToAllPlayer();
                 } else {
                     tell(player, "Choice is out of the range");
@@ -336,6 +373,7 @@ public class RoomController {
             player.placeBorder(action, position, angle);
         } else if (tileType.isKoi()) {
             player.placeKoi(tileType, action, position, angle);
+            game.offerPath(player);
         } else {
             throw new IllegalStateException("Unexpected tile type " + tileType);
         }
@@ -371,6 +409,34 @@ public class RoomController {
         sendToAllPlayer();
     }
 
+    private void moveKoi(Player player, Actions action, int koiId, int q, int r, int angle) {
+        if (!canAct(player)) {
+            return;
+        }
+        HexPosition position = new HexPosition(q, r);
+        if (!player.hasKoi(koiId)) {
+            tell(player, "There is no koi with id " + koiId + " in your pond");
+            return;
+        }
+        if (player.isKoiAt(koiId, position, angle)) {
+            tell(player, "The koi is already there: choose a different place");
+            return;
+        }
+        if (!player.canMoveKoi(koiId, position, angle)) {
+            tell(player, "The koi doesn't fit there with that rotation");
+            return;
+        }
+        if (!player.hasWorkerFor(action)) {
+            tell(player, "Nobody is free to move the koi");
+            return;
+        }
+        if (!startWorking(player)) {   // ultimo controllo: da qui lo stato cambia
+            return;
+        }
+        player.moveKoi(action, koiId, position, angle);
+        sendToAllPlayer();
+    }
+
     public synchronized void placeWater(Player player, int q, int r) {
         placeTile(player, TileType.WATER, Actions.PLACEWATER, q, r);
     }
@@ -403,8 +469,8 @@ public class RoomController {
         } 
     }
 
-    public synchronized void moveKoi(Player player) {
-        tell(player, "Moving koi is not available yet");
+    public synchronized void moveKoi(Player player, int koiId, int q, int r, int angle) {
+        moveKoi(player, Actions.MOVEKOI, koiId, q, r, angle);
     }
 
     private boolean canAct(Player player){
@@ -436,11 +502,21 @@ public class RoomController {
             tell(player, "You must meditate (draw a card) or work before ending your turn");
             return;
         }
+        if (game.checkObjectivesforPlayer(player)) {
+            endingTurn = player;
+            sendToAllPlayer();       // mostra la domanda
+            return;
+        }
+        finishTurn(player);
+    }
+
+    private void finishTurn(Player player) {
         player.turnEnded();          // stato IDLE, giocatore e aiutanti si riposano
         game.goToNextPlayer();
         sendMessageToAll("It's " + game.getActivePlayer().getName() + "'s turn");
         sendToAllPlayer();
     }
+
 
     
 }

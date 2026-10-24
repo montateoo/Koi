@@ -9,6 +9,9 @@ import java.util.Deque;
 
 import game.cards.*;
 import game.listeners.*;
+import game.objectives.Objective;
+import game.objectives.ObjectiveController;
+import game.objectives.ObjectiveType;
 
 public class GameRoom implements CardEffects, BoardListener, WarehouseListener, PlayerListener {
 
@@ -16,6 +19,7 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
     private Board board;
     private KoiMarket koiMarket;
     private Warehouse warehouse;
+    private ObjectiveController objectiveController;
     private Player activePlayer; //giocatore a cui spetta giocare
     private int activePlayerIndex;
     private final int maxAllowedPlayers = 4;
@@ -27,6 +31,7 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
         board.setListener(this);
         this.koiMarket = new KoiMarket();
         this.warehouse = new Warehouse();
+        this.objectiveController = new ObjectiveController();
         this.players = new ArrayList<>();
         playerNum = 0;
     }
@@ -41,6 +46,10 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
 
     public List<Player> getPlayers(){
         return Collections.unmodifiableList(players);
+    }
+
+    public List<Objective> getObjectives() {
+        return objectiveController.getObjectives();
     }
 
     public Player getActivePlayer(){
@@ -276,7 +285,7 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
         giveStartingTiles();
         giveStartingKit();
 
-        //pickObjectives();
+        objectiveController.initializeObjectives(playerNum);
 
         startTurnRotation();
 
@@ -306,4 +315,118 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
                 return null;
         }
     }
+
+    // Percorso: si offre ogni volta che il giocatore piazza una carpa, anche piu' volte nella stessa partita
+    public void offerPath(Player player) {
+        Objective path = objectiveController.find(ObjectiveType.PATH);
+        if (path == null || !path.canBeClaimedBy(player)) {
+            return;
+        }
+        pendingChoices.add(new PendingChoice(player,
+                "You placed a koi: do you want a path tile for " + ObjectiveType.PATH.cost() + " coins?",
+                List.of("Take a path tile", "No thanks"),
+                option -> {
+                    if (option == 0) {
+                        askPathPlacement(player, path.claim(player));
+                    }
+                }));
+    }
+
+    // gli obiettivi vanno piazzati subito: domanda con coordinate, cosi' nella GUI si clicca lo stagno
+    private void askPathPlacement(Player player, Tile tile) {
+        List<HexPosition> positions = player.getPlayablePositions(TileType.PATH);
+        List<String> labels = new ArrayList<>();
+        for (HexPosition position : positions) {
+            labels.add(position.toString());
+        }
+        pendingChoices.add(new PendingChoice(player, "Where do you place the path tile?", labels,
+                option -> player.getPond().placePath(tile, positions.get(option))));
+    }
+
+    // obiettivi con una forma (rami, shishi odoshi, carpa centenaria, tartaruga, ninfea viola):
+    // prima dove (coordinate, si clicca lo stagno), poi come orientarla se c'e' piu' di un modo; infine "then"
+    private void askObjectivePlacement(Player player, Tile tile, Runnable then) {
+        TileType type = tile.getTileType();
+        List<HexPosition> positions = player.getPlayablePositions(type);
+        if (positions.isEmpty()) {
+            player.addObjective(tile);   // non dovrebbe succedere: il requisito garantisce un posto
+            then.run();
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        for (HexPosition position : positions) {
+            labels.add(position.toString());
+        }
+        pendingChoices.add(new PendingChoice(player, "Where do you place the " + type.displayName() + "?", labels,
+                option -> askObjectiveRotation(player, tile, positions.get(option), then)));
+    }
+
+    private void askObjectiveRotation(Player player, Tile tile, HexPosition anchor, Runnable then) {
+        List<Integer> rotations = player.validRotations(tile.getTileType(), anchor);
+        if (rotations.size() == 1) {
+            player.getPond().placeObjective(tile, anchor, rotations.get(0));
+            then.run();
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        for (int rotation : rotations) {
+            labels.add("Rotation " + (rotation % 6) + (rotation >= 6 ? " (mirrored)" : ""));
+        }
+        pendingChoices.add(new PendingChoice(player, "How do you turn the " + tile.getTileType().displayName() + "?", labels,
+                option -> {
+                    player.getPond().placeObjective(tile, anchor, rotations.get(option));
+                    then.run();
+                }));
+    }
+
+    // tessere che askObjectivePlacement sa gia' piazzare; le altre (ponticello, statua...) per ora restano da parte
+    private static boolean placedByShape(TileType type) {
+        switch (type) {
+            case SMALLBRANCH:
+            case MEDIUMBRANCH:
+            case BIGBRANCH:
+            case SHISHIODOSHI:
+            case OLDCARP:
+            case TURTLE:
+            case PURPLELILY:
+            case STATUE:
+            case BRIDGE:
+            case WATERFALL:
+            case THREE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // true se ha messo in coda la domanda: il turno finisce dopo la risposta
+    public boolean checkObjectivesforPlayer(Player player) {
+        List<Objective> claimable = objectiveController.checkCompletedObjectives(player);
+        if (claimable.isEmpty()) {
+            return false;
+        }
+
+        List<String> options = new ArrayList<>();
+        for (Objective objective : claimable) {
+            options.add(objective.describeFor(player));
+        }
+        options.add("No thanks");
+
+        pendingChoices.add(new PendingChoice(player, "You can claim an objective: do you want it?", options,
+                option -> {
+                    if (option == claimable.size()) {
+                        return;                                   // "No thanks"
+                    }
+                    Tile tile = claimable.get(option).claim(player);
+                    // magari ne puo' prendere un altro: si ricontrolla solo dopo il piazzamento, che toglie acqua libera
+                    if (placedByShape(tile.getTileType())) {
+                        askObjectivePlacement(player, tile, () -> checkObjectivesforPlayer(player));
+                    } else {
+                        player.addObjective(tile);
+                        checkObjectivesforPlayer(player);
+                    }
+                }));
+        return true;
+    }
+
 }

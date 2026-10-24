@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
@@ -69,6 +70,9 @@ public class PondPane extends StackPane {
     private HexCoord hovered = null;     // esagono evidenziato sotto il mouse, per l'anteprima
     private Consumer<HexCoord> onHexClicked = coord -> { };
     private Function<HexCoord, List<HexCoord>> ghostShape = coord -> List.of(coord);
+    private IntConsumer onKoiClicked = id -> { };
+    private Set<Integer> movableKoi = Set.of();   // carpe che si possono cliccare per spostarle
+    private int selectedKoi = -1;                 // carpa scelta, in attesa della destinazione
 
     public PondPane(double size, boolean animated) {
         this.size = size;
@@ -190,6 +194,17 @@ public class PondPane extends StackPane {
         this.onHexClicked = handler;
     }
 
+    // chiamato quando il giocatore clicca una carpa che puo' spostare
+    public void setOnKoiClicked(IntConsumer handler) {
+        this.onKoiClicked = handler;
+    }
+
+    // da chiamare prima di show: quali carpe sono cliccabili e quale e' selezionata (-1 nessuna)
+    public void setMovableKoi(Set<Integer> ids, int selected) {
+        this.movableKoi = Set.copyOf(ids);
+        this.selectedKoi = selected;
+    }
+
     // dato l'esagono sotto il mouse, quali esagoni occuperebbe la tessera selezionata (anteprima)
     public void setGhostShape(Function<HexCoord, List<HexCoord>> shape) {
         this.ghostShape = shape;
@@ -243,9 +258,23 @@ public class PondPane extends StackPane {
         Group group = new Group();
 
         Polygon hex = KoiArt.hexagon(cx, cy, size);
-        switch (cell.base()) {
+        // aspetto della base: i pezzi tipo sponda sono pietra; il salice e' prato (senza lati azzurri)
+        // oppure acqua con le foglie, come il fogliame
+        boolean willow = cell.base().equals("THREE");
+        String look;
+        if (willow) {
+            look = cell.blueSides().contains(true) ? "LEAF" : "GRASS";
+        } else if (cell.base().equals("BORDER") || ObjectiveArt.isPondPiece(cell.base())) {
+            look = "BORDER";
+        } else {
+            look = cell.base();
+        }
+        switch (look) {
             case "BORDER":
                 hex.setFill(KoiArt.stoneFill(cx, cy, size));
+                break;
+            case "GRASS":
+                hex.setFill(KoiArt.grassFill(cx, cy, size));
                 break;
             case "WATERSOURCE":
                 hex.setFill(KoiArt.waterFill(cx, cy, size, true));
@@ -259,7 +288,10 @@ public class PondPane extends StackPane {
                 + (cell.top() == null ? "" : " + " + cell.top().toLowerCase())));
         group.getChildren().add(hex);
 
-        switch (cell.base()) {
+        switch (look) {
+            case "GRASS":
+                group.getChildren().add(KoiArt.grassTufts(cx, cy, size, Math.abs(cell.q() * 5 + cell.r() * 3)));
+                break;
             case "LEAF":
                 group.getChildren().add(KoiArt.floatingLeaves(cx, cy, size, Math.abs(cell.q() * 7 + cell.r() * 3)));
                 break;
@@ -324,7 +356,12 @@ public class PondPane extends StackPane {
 
     private void drawTops(List<CellView> cells, Set<String> topKeys) {
         Map<Integer, List<CellView>> koiById = new LinkedHashMap<>();
+        Map<Integer, List<CellView>> objectivesById = new LinkedHashMap<>();
+        Map<Integer, List<CellView>> piecesById = new LinkedHashMap<>();   // statua, ponticello... sono la base stessa
         for (CellView cell : cells) {
+            if (ObjectiveArt.isPondPiece(cell.base())) {
+                piecesById.computeIfAbsent(cell.tileId(), id -> new ArrayList<>()).add(cell);
+            }
             if (cell.top() == null) {
                 continue;
             }
@@ -355,12 +392,71 @@ public class PondPane extends StackPane {
                     break;
                 }
                 default:
-                    koiById.computeIfAbsent(cell.topId(), id -> new ArrayList<>()).add(cell);
+                    if (cell.top().endsWith("KOI")) {
+                        koiById.computeIfAbsent(cell.topId(), id -> new ArrayList<>()).add(cell);
+                    } else {
+                        objectivesById.computeIfAbsent(cell.topId(), id -> new ArrayList<>()).add(cell);
+                    }
             }
         }
 
         for (Map.Entry<Integer, List<CellView>> koi : koiById.entrySet()) {
             drawKoi(koi.getKey(), koi.getValue());
+        }
+        for (List<CellView> objective : objectivesById.values()) {
+            boolean fresh = false;
+            for (CellView cell : objective) {
+                fresh |= previousTops != null && !previousTops.contains(key(cell.q(), cell.r()) + cell.top());
+            }
+            drawObjective(objective, objective.get(0).top(), objective.get(0).topRotation(), true, fresh);
+        }
+        for (List<CellView> piece : piecesById.values()) {
+            boolean fresh = false;
+            for (CellView cell : piece) {
+                fresh |= previousBases != null && !previousBases.contains(key(cell.q(), cell.r()) + cell.base());
+            }
+            // il salice sta sul prato, non al centro del pezzo (coprirebbe i sassi e l'acqua)
+            List<CellView> under = piece;
+            if (piece.get(0).base().equals("THREE")) {
+                under = new ArrayList<>();
+                for (CellView cell : piece) {
+                    if (!cell.blueSides().contains(true)) {
+                        under.add(cell);
+                    }
+                }
+            }
+            drawObjective(under, piece.get(0).base(), 0, false, fresh);
+        }
+    }
+
+    // tessera obiettivo: il disegno sul baricentro dei suoi esagoni, girato come la tessera;
+    // per quelle sopra l'acqua anche un'impronta dorata, cosi' si vede quali esagoni coprono
+    private void drawObjective(List<CellView> cells, String type, int rotation, boolean veiled, boolean fresh) {
+        double sumX = 0, sumY = 0;
+        for (CellView cell : cells) {
+            double x = centerX(cell.q(), cell.r());
+            double y = centerY(cell.q(), cell.r());
+            sumX += x;
+            sumY += y;
+            if (veiled) {
+                Polygon veil = KoiArt.hexagon(x, y, size * 0.9);
+                veil.setFill(Color.color(0.83, 0.63, 0.23, 0.18));
+                veil.setStroke(Color.color(0.83, 0.63, 0.23, 0.7));
+                veil.setStrokeWidth(1.2);
+                tops.getChildren().add(veil);
+            }
+        }
+        Group art = ObjectiveArt.objective(type, size, cells.size());
+        if (ObjectiveArt.hasShape(type)) {
+            ObjectiveArt.orient(art, rotation);
+        }
+        Group holder = new Group(art);   // il contenitore si sposta, il disegno dentro ruota attorno a (0, 0)
+        holder.setLayoutX(sumX / cells.size());
+        holder.setLayoutY(sumY / cells.size());
+        Tooltip.install(holder, new Tooltip(PlayerPanel.readable(type)));
+        tops.getChildren().add(holder);
+        if (fresh) {
+            popIn(holder);
         }
     }
 
@@ -391,6 +487,18 @@ public class PondPane extends StackPane {
         holder.setLayoutY(cy);
         holder.setRotate(angle);
         tops.getChildren().add(holder);
+        if (movableKoi.contains(id)) {
+            holder.setCursor(Cursor.HAND);
+            holder.setOnMouseClicked(e -> {
+                if (e.isStillSincePress()) {
+                    onKoiClicked.accept(id);
+                }
+                e.consume();
+            });
+            if (id == selectedKoi) {
+                holder.setEffect(new DropShadow(size * 0.5, Theme.GOLD));
+            }
+        }
 
         if (animated) {
             double delay = random.nextDouble() * 1.5;

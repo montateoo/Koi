@@ -1,8 +1,10 @@
 package client.gui;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
@@ -14,39 +16,32 @@ import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
-import javafx.animation.PathTransition;
 import javafx.animation.PauseTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.SequentialTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Group;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.CubicCurveTo;
-import javafx.scene.shape.MoveTo;
-import javafx.scene.shape.Path;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import network.CellView;
 import network.GameView;
 import network.HexCoord;
 import network.PlayerView;
@@ -66,11 +61,14 @@ public class GuiView implements View {
         return thread;
     });
 
-    // lobby
-    private final TextField nicknameField = new TextField();
+    // schermata iniziale
+    private TitleScreen title;
+    private Scene titleScene;
+
+    // lista delle stanze
     private final ListView<String> roomList = new ListView<>();
-    private final TextField roomNameField = new TextField();
-    private final Label lobbyStatus = new Label("Connecting...");
+    private final Label lobbyPlayer = new Label();
+    private final Label lobbyStatus = new Label();
     private Scene lobbyScene;
 
     // stanza
@@ -80,6 +78,7 @@ public class GuiView implements View {
     private final BoardPane board = new BoardPane();
     private final PondPane myPond = new PondPane(40, true);
     private final PlayerPanel playerPanel = new PlayerPanel();
+    private final ObjectivesPane objectives = new ObjectivesPane();
     private final VBox opponents = new VBox(14);
     private final TextArea roomLog = new TextArea();
     private final StackPane questionLayer = new StackPane();
@@ -93,9 +92,15 @@ public class GuiView implements View {
 
     public GuiView(Stage stage) {
         this.stage = stage;
+        buildTitleScene();
         buildLobbyScene();
         buildRoomScene();
-        stage.setScene(lobbyScene);
+        stage.setScene(titleScene);
+    }
+
+    // da chiamare dopo stage.show(), cosi' l'animazione d'apertura si vede dall'inizio
+    public void startIntro() {
+        title.playIntro();
     }
 
     public void setController(ClientController controller) {
@@ -106,96 +111,96 @@ public class GuiView implements View {
         network.execute(task);
     }
 
-    // ================================================================= lobby
+    // ================================================================= schermata iniziale
+
+    private void buildTitleScene() {
+        title = new TitleScreen();
+        title.setOnPlay(this::openRoomList);
+        title.setOnCreateRoom(roomName -> inBackground(() -> controller.createAndJoin(roomName, Settings.nickname())));
+        title.setOnServerChanged(() -> inBackground(() -> {
+            if (controller.connect(Settings.host(), Settings.port())) {
+                showMessage("Connesso a " + Settings.host() + ":" + Settings.port());
+            }
+        }));
+        titleScene = new Scene(title, 1280, 720);
+        titleScene.getStylesheets().add(stylesheet());
+    }
+
+    private void openRoomList() {
+        lobbyPlayer.setText("Giochi come " + Settings.nickname());
+        lobbyStatus.setText("");
+        stage.setScene(lobbyScene);
+        inBackground(controller::refreshRooms);
+    }
+
+    // ================================================================= lista delle stanze
 
     private void buildLobbyScene() {
-        nicknameField.setPromptText("Your nickname");
-        roomNameField.setPromptText("New room name");
-        roomList.setPlaceholder(new Label("No rooms yet"));
-        roomList.setPrefHeight(160);
+        roomList.setPlaceholder(new Label("Nessuna stanza: creane una dal menu"));
+        roomList.setPrefHeight(220);
+        lobbyPlayer.getStyleClass().add("muted");
         lobbyStatus.getStyleClass().add("muted");
+        lobbyStatus.setWrapText(true);
 
-        Button refresh = new Button("Refresh");
-        refresh.getStyleClass().add("ghost");
-        refresh.setOnAction(e -> inBackground(controller::refreshRooms));
-
-        Button join = new Button("Join room");
-        join.setOnAction(e -> {
-            String nickname = nicknameField.getText().trim();
-            String roomId = roomList.getSelectionModel().getSelectedItem();
-            if (nickname.isEmpty()) {
-                showError("Enter a nickname first");
-            } else if (roomId == null) {
-                showError("Select a room first");
-            } else {
-                inBackground(() -> controller.joinRoom(roomId, nickname));
-            }
+        Button back = new Button("← Menu");
+        back.getStyleClass().add("wood-button");
+        back.setOnAction(e -> {
+            stage.setScene(titleScene);
+            title.showMenuNow();
         });
 
-        Button create = new Button("Create");
-        create.getStyleClass().add("ghost");
-        create.setOnAction(e -> {
-            String roomName = roomNameField.getText().trim();
-            if (roomName.isEmpty()) {
-                showError("Enter a room name first");
-            } else {
-                inBackground(() -> controller.createRoom(roomName));
+        Button refresh = new Button("Aggiorna");
+        refresh.getStyleClass().add("wood-button");
+        refresh.setOnAction(e -> inBackground(controller::refreshRooms));
+
+        Button join = new Button("Entra");
+        join.getStyleClass().add("wood-button");
+        join.setDefaultButton(true);
+        join.setOnAction(e -> joinSelected());
+        roomList.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                joinSelected();
             }
         });
 
         Text kanji = new Text(Theme.hasJapanese() ? "鯉" : "K");
-        kanji.setFont(Theme.kanji(84));
+        kanji.setFont(Theme.kanji(56));
         kanji.setFill(Theme.VERMILION);
         kanji.setEffect(new DropShadow(10, Color.color(0.5, 0.1, 0.05, 0.3)));
-        Text title = new Text("K O I");
-        title.setFont(Theme.title(34));
-        title.setFill(Theme.INK);
-        Text subtitle = new Text("build the most serene pond for your koi");
-        subtitle.setFont(Theme.serif(14));
-        subtitle.setFill(Theme.INK_SOFT);
-        VBox heading = new VBox(0, kanji, title, subtitle);
-        heading.setAlignment(Pos.CENTER);
+        Text heading = new Text("Stanze");
+        heading.setFont(Theme.title(30));
+        heading.setFill(Theme.INK);
+        HBox top = new HBox(12, kanji, heading);
+        top.setAlignment(Pos.CENTER_LEFT);
 
-        HBox.setHgrow(roomNameField, Priority.ALWAYS);
-        VBox card = new VBox(10, heading, new Label("Nickname"), nicknameField, new Label("Rooms"), roomList,
-                new HBox(8, join, refresh), new HBox(8, roomNameField, create), lobbyStatus);
-        card.getStyleClass().add("panel");
-        card.setPadding(new Insets(22, 28, 22, 28));
-        card.setMaxWidth(420);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        for (Button button : new Button[] {back, refresh, join}) {
+            button.setMinWidth(Region.USE_PREF_SIZE);   // la targa non si stringe fino a tagliare la scritta
+        }
+        HBox actions = new HBox(8, back, spacer, refresh, join);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        VBox card = new VBox(10, top, lobbyPlayer, roomList, actions, lobbyStatus);
+        card.getStyleClass().add("koi-panel");
+        card.setMaxWidth(480);
         card.setMaxHeight(Region.USE_PREF_SIZE);
 
-        StackPane root = new StackPane(
-                new WavePattern(Theme.PAPER, Theme.TEAL.deriveColor(0, 1, 1, 0.2)),
-                swimmingKoi(),
-                card,
-                new SakuraLayer(18));
-        lobbyScene = new Scene(root, 960, 680);
+        Region veil = new Region();
+        veil.setStyle("-fx-background-color: rgba(8, 24, 24, 0.45);");
+        veil.setMouseTransparent(true);
+        StackPane root = new StackPane(veil, new SakuraLayer(12), card);
+        root.getStyleClass().add("lobby-root");
+        lobbyScene = new Scene(root, 1280, 720);
         lobbyScene.getStylesheets().add(stylesheet());
     }
 
-    // carpe decorative che attraversano lo sfondo della lobby lungo curve morbide
-    private Node swimmingKoi() {
-        Pane pond = new Pane();
-        pond.setMouseTransparent(true);
-        double[][] routes = {
-            {-120, 520, 250, 360, 600, 640, 1100, 420},
-            {1100, 160, 760, 40, 330, 300, -140, 120},
-            {-120, 260, 300, 120, 650, 380, 1100, 250}
-        };
-        for (int i = 0; i < routes.length; i++) {
-            double[] p = routes[i];
-            Group fish = KoiArt.koi(80 + i * 14, i);
-            fish.setOpacity(0.85);
-            Path path = new Path(new MoveTo(p[0], p[1]), new CubicCurveTo(p[2], p[3], p[4], p[5], p[6], p[7]));
-            PathTransition swim = new PathTransition(Duration.seconds(16 + i * 5), path, fish);
-            swim.setOrientation(PathTransition.OrientationType.ORTHOGONAL_TO_TANGENT);
-            swim.setInterpolator(Interpolator.LINEAR);
-            swim.setCycleCount(Animation.INDEFINITE);
-            swim.setDelay(Duration.seconds(i * 3.5));
-            swim.play();
-            pond.getChildren().add(fish);
+    private void joinSelected() {
+        String roomId = roomList.getSelectionModel().getSelectedItem();
+        if (roomId == null) {
+            lobbyStatus.setText("Scegli una stanza dalla lista");
+        } else {
+            inBackground(() -> controller.joinRoom(roomId, Settings.nickname()));
         }
-        return pond;
     }
 
     // ================================================================= stanza
@@ -235,6 +240,7 @@ public class GuiView implements View {
         });
         playerPanel.setOnTileSelected(this::select);
         myPond.setOnHexClicked(this::placeSelected);
+        myPond.setOnKoiClicked(id -> select(GameView.moveKey(id)));
         myPond.setGhostShape(this::ghostCells);
         myPond.setAutoFit(true);
         myPond.enableZoomAndPan();
@@ -279,7 +285,13 @@ public class GuiView implements View {
         VBox log = new VBox(8, logTitle, roomLog);
         log.getStyleClass().add("panel");
 
-        VBox right = new VBox(12, others, log);
+        Label objectivesTitle = new Label("Objectives");
+        objectivesTitle.getStyleClass().add("panel-title");
+        objectives.update(List.of());
+        VBox objectivesBox = new VBox(8, objectivesTitle, objectives);
+        objectivesBox.getStyleClass().add("panel");
+
+        VBox right = new VBox(12, objectivesBox, others, log);
         right.setPrefWidth(300);
         right.setMinWidth(260);
 
@@ -340,6 +352,17 @@ public class GuiView implements View {
         } else {
             spots = List.of();
         }
+        // le carpe con almeno una destinazione si possono cliccare per spostarle
+        Set<Integer> movable = new HashSet<>();
+        if (placementQuestion().isEmpty()) {
+            for (String key : lastView.playablePositions().keySet()) {
+                if (GameView.isMoveKey(key)) {
+                    movable.add(GameView.koiIdOf(key));
+                }
+            }
+        }
+        int selectedKoi = GameView.isMoveKey(selectedType) ? GameView.koiIdOf(selectedType) : -1;
+        myPond.setMovableKoi(movable, selectedKoi);
         myPond.show(me(lastView).pond(), spots);
     }
 
@@ -438,10 +461,11 @@ public class GuiView implements View {
         } else if (lastView.question() != null) {
             hint.setText(lastView.question());
         } else if (selectedType != null) {
-            hint.setText("Click a highlighted hex to place the " + PlayerPanel.readable(selectedType).toLowerCase()
-                    + (rotatable(selectedType) ? "   ·   R to rotate" : "") + "   ·   Esc to cancel");
+            String action = GameView.isMoveKey(selectedType) ? "move the " : "place the ";
+            hint.setText("Click a highlighted hex to " + action + PlayerPanel.readable(shapeOf(selectedType)).toLowerCase()
+                    + (rotatable(shapeOf(selectedType)) ? "   ·   R to rotate" : "") + "   ·   Esc to cancel");
         } else {
-            hint.setText("Meditate: take a card from the board.   Work: pick a tile from your storage.   Then end your turn.");
+            hint.setText("Meditate: take a card from the board.   Work: pick a tile from your storage, or click a koi to move it.   Then end your turn.");
         }
     }
 
@@ -472,6 +496,20 @@ public class GuiView implements View {
         updateHint();
     }
 
+    // tipo di tessera di cui disegnare la forma: per uno spostamento, la taglia della carpa scelta
+    private String shapeOf(String type) {
+        if (!GameView.isMoveKey(type) || lastView == null) {
+            return type;
+        }
+        int koiId = GameView.koiIdOf(type);
+        for (CellView cell : me(lastView).pond()) {
+            if (cell.topId() == koiId) {
+                return cell.top();
+            }
+        }
+        return "SMALLKOI";
+    }
+
     private static boolean rotatable(String type) {
         return type.equals("BORDER") || type.equals("MEDIUMKOI") || type.equals("BIGKOI");
     }
@@ -492,7 +530,7 @@ public class GuiView implements View {
             return List.of(anchor);
         }
         int rotation = currentRotation(anchor);
-        switch (selectedType) {
+        switch (shapeOf(selectedType)) {
             case "BORDER":
                 return List.of(anchor, neighbour(anchor, 4 + rotation), neighbour(anchor, rotation));
             case "MEDIUMKOI":
@@ -522,6 +560,11 @@ public class GuiView implements View {
         int r = coord.r();
         int rotation = currentRotation(coord);
         select(null);
+        if (GameView.isMoveKey(type)) {
+            int koiId = GameView.koiIdOf(type);
+            inBackground(() -> controller.moveKoi(koiId, q, r, rotation));
+            return;
+        }
         inBackground(() -> {
             switch (type) {
                 case "WATER":
@@ -560,9 +603,7 @@ public class GuiView implements View {
     @Override
     public void showLobby(List<String> rooms) {
         Platform.runLater(() -> {
-            roomList.getItems().setAll(rooms);
-            lobbyStatus.setText("");
-            stage.setScene(lobbyScene);
+            roomList.getItems().setAll(rooms);   // aggiorna soltanto: si arriva qui dal menu con "Gioca"
         });
     }
 
@@ -601,6 +642,7 @@ public class GuiView implements View {
             turnStatus.setText(view.isMyTurn() ? "Your turn" : "Turn of " + view.activePlayer());
             board.update(view.board(), view.canDraw());
             playerPanel.update(me(view), view.playablePositions().keySet(), selectedType);
+            objectives.update(view.objectives());
             refreshPond();
             refreshOpponents(view);
             refreshQuestion(view);
@@ -614,6 +656,8 @@ public class GuiView implements View {
     private void show(String text) {
         if (stage.getScene() == roomScene) {
             roomLog.appendText(text + "\n");
+        } else if (stage.getScene() == titleScene) {
+            title.showToast(text);
         } else {
             lobbyStatus.setText(text);
         }

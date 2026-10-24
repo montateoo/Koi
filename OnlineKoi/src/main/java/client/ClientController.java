@@ -35,6 +35,9 @@ public class ClientController {
     }
 
     public void refreshRooms() {
+        if (!connected()) {
+            return;
+        }
         try {
             view.showLobby(lobby.listRooms());
         } catch (RemoteException | RuntimeException e) {
@@ -43,6 +46,9 @@ public class ClientController {
     }
 
     public void createRoom(String roomName) {
+        if (!connected()) {
+            return;
+        }
         try {
             String roomId = lobby.createRoom(roomName);
             view.showMessage("Created room " + roomId);
@@ -52,7 +58,22 @@ public class ClientController {
         }
     }
 
+    // crea la stanza e ci entra subito (pulsante "Crea Stanza" della schermata iniziale)
+    public void createAndJoin(String roomName, String nickname) {
+        if (!connected()) {
+            return;
+        }
+        try {
+            joinRoom(lobby.createRoom(roomName), nickname);
+        } catch (RemoteException | RuntimeException e) {
+            view.showError("Could not create the room: " + describe(e));
+        }
+    }
+
     public void joinRoom(String roomId, String nickname) {
+        if (!connected()) {
+            return;
+        }
         if (session != null) {
             view.showError("You are already in a room");
             return;
@@ -164,6 +185,18 @@ public class ClientController {
         }
     }
 
+    public void moveKoi(int koiId, int q, int r, int angle) {
+        if (session == null){
+            view.showError("Join a session first");
+            return;
+        }
+        try {
+            session.moveKoi(koiId,q,r,angle);
+        } catch (RemoteException | RuntimeException e) {
+            view.showError("Could not move the koi: " + describe(e));
+        }  
+    }
+
     public void endTurn() {
         try {
             session.endTurn();
@@ -202,6 +235,15 @@ public class ClientController {
             }
             System.exit(0);
         }
+    }
+
+    // senza server raggiungibile le azioni della lobby non possono funzionare: lo si dice chiaramente
+    private boolean connected() {
+        if (lobby == null) {
+            view.showError("Not connected to the server: check the address in the settings");
+            return false;
+        }
+        return true;
     }
 
     private static String describe(Exception e) {

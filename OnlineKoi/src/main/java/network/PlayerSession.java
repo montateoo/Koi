@@ -14,7 +14,7 @@ public interface PlayerSession extends Remote {
     void placeLeafs(int q, int r) throws RemoteException;
     void placeLily(int q, int r) throws RemoteException;
     void placeKoi(int type, int q, int r, int angle) throws RemoteException;
-    void moveKoi() throws RemoteException;
+    void moveKoi(int koiId, int q, int r, int angle) throws RemoteException;
     void endTurn() throws RemoteException;
 
 }

@@ -4,8 +4,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import network.CellView;
 import network.GameView;
 import network.HexCoord;
+import network.ObjectiveView;
 import network.PlayerView;
 
 // trasforma una GameView in testo: usato dalla TUI e, per ora, anche dal log della GUI
@@ -41,6 +43,15 @@ public final class GameViewPrinter {
             out.append("  scrolls: ").append(listOrDash(player.scrolls())).append('\n');
         }
 
+        if (!view.objectives().isEmpty()) {
+            out.append('\n').append("Objectives").append('\n');
+            for (ObjectiveView objective : view.objectives()) {
+                out.append(String.format("  %-15s %s%s  [%d left]%s%n", objective.name(),
+                        objective.cost() > 0 ? objective.cost() + " coins, " : "", objective.requirement(),
+                        objective.tilesLeft(), objective.claimable() ? "  <<< claimable (end)" : ""));
+            }
+        }
+
         if (!view.playablePositions().isEmpty()) {
             out.append('\n').append("You can place:").append('\n');
             for (Map.Entry<String, List<HexCoord>> entry : view.playablePositions().entrySet()) {
@@ -55,7 +66,7 @@ public final class GameViewPrinter {
                     }
                     spots.append("  ");
                 }
-                out.append(String.format("  %-19s %s%n", label(type), spots.toString().trim()));
+                out.append(String.format("  %-19s %s%n", label(type, view), spots.toString().trim()));
             }
         }
 
@@ -74,13 +85,33 @@ public final class GameViewPrinter {
     }
 
     // nome leggibile del tipo; per le carpe anche il numero da usare nel comando "koi <tipo> <q> <r> <rotazione>"
-    private static String label(String type) {
+    // o, per una carpa gia' nello stagno, l'id da usare in "move <id> <q> <r> <rotazione>"
+    private static String label(String type, GameView view) {
+        if (GameView.isMoveKey(type)) {
+            int koiId = GameView.koiIdOf(type);
+            return "move " + koiName(koiId, view) + " (move " + koiId + ")";
+        }
         switch (type) {
             case "SMALLKOI":  return "small koi (koi 0)";
             case "MEDIUMKOI": return "medium koi (koi 1)";
             case "BIGKOI":    return "big koi (koi 2)";
             default:          return type.toLowerCase();
         }
+    }
+
+    // "small koi", "medium koi"... cercando la carpa con quell'id nello stagno di chi guarda
+    private static String koiName(int koiId, GameView view) {
+        for (PlayerView player : view.players()) {
+            if (!player.name().equals(view.viewer())) {
+                continue;
+            }
+            for (CellView cell : player.pond()) {
+                if (cell.topId() == koiId) {
+                    return cell.top().replace("KOI", " koi").toLowerCase();
+                }
+            }
+        }
+        return "koi";
     }
 
     // [WATER, WATER, SMALLKOI] -> "WATER x2, SMALLKOI x1"

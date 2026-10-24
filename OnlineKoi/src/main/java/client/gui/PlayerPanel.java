@@ -181,6 +181,18 @@ public class PlayerPanel extends VBox {
             case "SMALLKOI":  return "Small koi";
             case "MEDIUMKOI": return "Medium koi";
             case "BIGKOI":    return "Big koi";
+            case "SMALLBRANCH":  return "Small branch";
+            case "MEDIUMBRANCH": return "Medium branch";
+            case "BIGBRANCH":    return "Big branch";
+            case "SHISHIODOSHI": return "Shishi odoshi";
+            case "OLDCARP":      return "Old carp";
+            case "PURPLELILY":   return "Purple lily";
+            case "TURTLE":       return "Turtle";
+            case "THREE":        return "Weeping willow";
+            case "WATERFALL":    return "Waterfall";
+            case "BRIDGE":       return "Bridge";
+            case "STATUE":       return "Statue";
+            case "PATH":         return "Path";
             default:          return type.toLowerCase();
         }
     }
