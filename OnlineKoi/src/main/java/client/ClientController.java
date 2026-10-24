@@ -1,252 +1,114 @@
 package client;
 
-import java.rmi.NoSuchObjectException;
-import java.rmi.NotBoundException;
-import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
+import java.io.IOException;
 
-import network.Lobby;
-import network.PlayerSession;
+import messages.ClientMessage;
 
-// logica del client condivisa da TextView e GuiView: parla con il server e mostra i risultati tramite la view.
-// Si catturano anche le RuntimeException perche' un errore nel codice del server arriva al client in quella forma.
 public class ClientController {
 
     private final View view;
-    private Lobby lobby;
-    private PlayerSession session;
-    private ClientCallbackImpl callback;
+    private ServerConnection server;
 
     public ClientController(View view) {
         this.view = view;
     }
 
-    public boolean connect(String host, int port) {
+    // unico punto da cui partono i messaggi: controlla la connessione e gestisce l'errore di scrittura
+    private void send(ClientMessage message) {
+        if (server == null) {
+            view.showError("Not connected to the server: check the address in the settings");
+            return;
+        }
         try {
-            Registry registry = LocateRegistry.getRegistry(host, port);
-            lobby = (Lobby) registry.lookup("KoiGame");
+            server.send(message);
+        } catch (IOException e) {
+            view.showError("Could not reach the server: " + e.getMessage());
+        }
+    }
+
+
+    public boolean connect(String host, int port) {
+        if (server != null) {
+            server.close();   // cambio di server dalle impostazioni: la vecchia connessione va chiusa
+            server = null;
+        }
+        try {
+            server = new ServerConnection(host, port, view);
             return true;
-        } catch (RemoteException | NotBoundException e) {
-            view.showError("Cannot reach the server: " + describe(e));
+        } catch (IOException e) {
+            view.showError("Cannot reach the server " + host + ":" + port + " (" + e.getMessage() + ")");
             return false;
         }
     }
 
     public void refreshRooms() {
-        if (!connected()) {
-            return;
-        }
-        try {
-            view.showLobby(lobby.listRooms());
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not load the rooms: " + describe(e));
-        }
+        send(new ClientMessage.ListRooms());
     }
 
     public void createRoom(String roomName) {
-        if (!connected()) {
-            return;
-        }
-        try {
-            String roomId = lobby.createRoom(roomName);
-            view.showMessage("Created room " + roomId);
-            refreshRooms();
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not create the room: " + describe(e));
-        }
+        send(new ClientMessage.CreateRoom(roomName));
     }
 
     // crea la stanza e ci entra subito (pulsante "Crea Stanza" della schermata iniziale)
     public void createAndJoin(String roomName, String nickname) {
-        if (!connected()) {
-            return;
-        }
-        try {
-            joinRoom(lobby.createRoom(roomName), nickname);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not create the room: " + describe(e));
-        }
+        send(new ClientMessage.CreateAndJoinRoom(roomName, nickname));
     }
 
     public void joinRoom(String roomId, String nickname) {
-        if (!connected()) {
-            return;
-        }
-        if (session != null) {
-            view.showError("You are already in a room");
-            return;
-        }
-        try {
-            if (callback == null) {
-                callback = new ClientCallbackImpl(view);
-            }
-            session = lobby.join(roomId, nickname, callback);
-            view.showRoom(roomId);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not join room " + roomId + ": " + describe(e));
-        }
+        send(new ClientMessage.JoinRoom(roomId, nickname));
     }
 
     public void startGame() {
-        if (session == null) {
-            view.showError("Join a room first");
-            return;
-        }
-        try {
-            session.startGame();
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not start the game: " + describe(e));
-        }
+        send(new ClientMessage.StartGame());
     }
 
     public void drawCard(int position) {
-        if (session == null) {
-            view.showError("Join a room first");
-            return;
-        }
-        try {
-            session.drawCard(position);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not draw the card: " + describe(e));
-        }
+        send(new ClientMessage.DrawCard(position));
     }
 
     public void placeWater(int q, int r){
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }
-        try {
-            session.placeWater(q, r);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not place water: " + describe(e));
-        }
+        send(new ClientMessage.PlaceWater(q,r));
     }
 
     public void placeLeaf(int q, int r){
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }
-        try {
-            session.placeLeafs(q,r);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not place leaf: " + describe(e));
-        }
+        send(new ClientMessage.PlaceLeafs(q,r));
     }
 
     public void placeLily(int q, int r){
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }
-        try {
-            session.placeLily(q,r);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not place lily: " + describe(e));
-        }
+        send(new ClientMessage.PlaceLily(q,r));
     }
 
     public void placeBorder(int q, int r, int angle) {
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }  
-        try {
-            session.placeBorder(q,r,angle);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not place border: " + describe(e));
-        } 
+        send(new ClientMessage.PlaceBorder(q,r,angle));
     }
     
     public void placeLantern(int q, int r) {
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }
-        try {
-            session.placeLantern(q,r);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not place lantern: " + describe(e));
-        }
+        send(new ClientMessage.PlaceLantern(q,r));
     }
 
     public void placeKoi(int type, int q, int r, int angle) {
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }
-        try {
-            session.placeKoi(type,q,r,angle);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not place the koi: " + describe(e));
-        }
+        send(new ClientMessage.PlaceKoi(type,q,r,angle));
     }
 
     public void moveKoi(int koiId, int q, int r, int angle) {
-        if (session == null){
-            view.showError("Join a session first");
-            return;
-        }
-        try {
-            session.moveKoi(koiId,q,r,angle);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not move the koi: " + describe(e));
-        }  
+        send(new ClientMessage.MoveKoi(koiId,q,r,angle));
     }
 
     public void endTurn() {
-        try {
-            session.endTurn();
-        } catch (RemoteException e) {
-            view.showError("Could not end the turn: " + describe(e));
-        }
+        send(new ClientMessage.EndTurn());
     }
 
     public void choose(int option) {
-        if (session == null) {
-            view.showError("Join a room first");
-            return;
-        }
-        try {
-            session.choose(option);
-        } catch (RemoteException | RuntimeException e) {
-            view.showError("Could not send your choice: " + describe(e));
-        }
+        send(new ClientMessage.Choose(option));
     }
-
 
     public void quit() {
-        try {
-            if (session != null) {
-                session.leave();
-            }
-        } catch (Exception e) {
-            view.showError("Could not notify the server: " + describe(e));
-        } finally {
-            if (callback != null) {
-                try {
-                    UnicastRemoteObject.unexportObject(callback, true);
-                } catch (NoSuchObjectException e) {
-                    // gia' rimosso, niente da fare
-                }
-            }
-            System.exit(0);
+        if (server != null) {
+            send(new ClientMessage.Leave());   // avvisa il server (send fa gia' flush: il messaggio parte subito)
+            server.close();
         }
+        System.exit(0);
     }
 
-    // senza server raggiungibile le azioni della lobby non possono funzionare: lo si dice chiaramente
-    private boolean connected() {
-        if (lobby == null) {
-            view.showError("Not connected to the server: check the address in the settings");
-            return false;
-        }
-        return true;
-    }
 
-    private static String describe(Exception e) {
-        return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-    }
 }

@@ -1,19 +1,36 @@
 package server;
 
-import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 public class ServerMain {
-    public static void main(String[] args) throws RemoteException{
 
-        LobbyImpl lobby = new LobbyImpl();
+    public static final int PORT = 1099;   // la stessa che usano TextView e le Impostazioni del client
 
-        Registry registry = LocateRegistry.createRegistry(1099); //1099 è la porta standard per RMI
-        registry.rebind("KoiGame", lobby); //KoiGame è il name che i client devono usare per il lookup
-
-        System.out.println("Server ready");
-
+    public static void main(String[] args) throws IOException {
+        Lobby lobby = new Lobby();
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            System.out.println("Server ready on port " + PORT);
+            while (true) {
+                Socket socket = serverSocket.accept();   // aspetta il prossimo client
+                Thread.ofVirtual().start(() -> serve(socket, lobby));
+            }
+        }
     }
-    
+
+    private static void serve(Socket socket, Lobby lobby) {
+
+        try {
+            ClientHandler clientHandler = new ClientHandler(socket,lobby);
+            clientHandler.run();
+        } catch (IOException e) {
+            try {
+                socket.close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+        }
+    }
 }
+

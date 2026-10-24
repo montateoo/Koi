@@ -1,6 +1,5 @@
 package server;
 
-import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -10,7 +9,6 @@ import java.util.Map;
 import java.util.Set;
 
 import network.CellView;
-import network.ClientCallback;
 import network.GameView;
 import network.HexCoord;
 import network.ObjectiveView;
@@ -28,6 +26,7 @@ import game.TileType;
 import game.cards.Actions;
 import game.objectives.Objective;
 import game.objectives.ObjectiveType;
+import messages.ServerMessage;
 import game.cards.Card;
 
 
@@ -37,7 +36,7 @@ public class RoomController {
     private String roomName;
     private GameRoom game;
     private GameState gameState;
-    private LinkedHashMap<Player, ClientCallback> joinedPlayers;
+    private LinkedHashMap<Player, ClientHandler> joinedPlayers;
     private final Set<Player> readyPlayers = new HashSet<>();
     private Player endingTurn;   // giocatore che ha premuto End ma deve ancora rispondere sugli obiettivi
 
@@ -50,18 +49,21 @@ public class RoomController {
         this.joinedPlayers = new LinkedHashMap<>();
     }
 
-    public synchronized void addPlayer(Player newPlayer, ClientCallback callback){
-        if((gameState==GameState.WAITING)&&(!game.isFull())){
-            joinedPlayers.put(newPlayer, callback);
-            game.addPlayer(newPlayer);          
-            try {
-                callback.onMessage("Welcome to the game " + newPlayer.getName());
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        } else {
-            //TODO handle that the room is closed
+    // true se il giocatore e' entrato; e' la stanza a dire Joined, cosi' arriva prima del benvenuto
+    public synchronized boolean addPlayer(Player newPlayer, ClientHandler client) {
+        if (gameState != GameState.WAITING) {
+            client.send(new ServerMessage.ErrorMessage("The game has already started"));
+            return false;
         }
+        if (game.isFull()) {
+            client.send(new ServerMessage.ErrorMessage("The room is full"));
+            return false;
+        }
+        joinedPlayers.put(newPlayer, client);
+        game.addPlayer(newPlayer);
+        client.send(new ServerMessage.Joined(gameId));
+        client.send(new ServerMessage.Info("Welcome to the game " + newPlayer.getName()));
+        return true;
     }
 
     public synchronized void startGame(Player player) {
@@ -100,12 +102,8 @@ public class RoomController {
 
     // ogni giocatore riceve la propria GameView, cosi' il client sa chi e' "you"
     private void sendToAllPlayer() {
-        for(Map.Entry<Player, ClientCallback> entry: joinedPlayers.entrySet()){
-            try {
-                entry.getValue().onGameUpdate(buildView(entry.getKey()));
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
+        for (Map.Entry<Player, ClientHandler> entry : joinedPlayers.entrySet()) {
+            entry.getValue().send(new ServerMessage.GameUpdate(buildView(entry.getKey())));
         }
     }
 
@@ -246,21 +244,13 @@ public class RoomController {
     }
 
     private void sendMessageToAll(String message){
-        for(ClientCallback target: joinedPlayers.values()){
-            try {
-                target.onMessage(message);
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
+        for(ClientHandler target: joinedPlayers.values()){
+            target.send(new ServerMessage.Info(message));
         }
     }
 
     private void tell(Player target, String message){
-        try {
-            joinedPlayers.get(target).onMessage(message);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
+        joinedPlayers.get(target).send(new ServerMessage.Info(message));
     }
 
     private synchronized void changeState() {
