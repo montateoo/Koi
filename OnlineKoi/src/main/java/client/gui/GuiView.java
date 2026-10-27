@@ -41,9 +41,11 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import game.scoring.ScoreSheet;
 import network.CellView;
 import network.GameView;
 import network.HexCoord;
+import network.MatchRecord;
 import network.PlayerView;
 
 public class GuiView implements View {
@@ -82,6 +84,16 @@ public class GuiView implements View {
     private final VBox opponents = new VBox(14);
     private final TextArea roomLog = new TextArea();
     private final StackPane questionLayer = new StackPane();
+    private final StackPane scoresLayer = new StackPane();   // classifica finale: separata dalle domande, che ogni aggiornamento chiude
+    private final Button scoresButton = new Button("Classifica");
+    private final Button startButton = new Button("Inizia");
+    private final Button endTurnButton = new Button("Passa il turno");
+    private final Button homeButton = new Button("Menu");     // a fine partita, al posto di Inizia e Passa il turno
+
+    // storico partite
+    private HistoryPane historyPane;
+    private Scene historyScene;
+    private List<ScoreSheet> finalRanking;                   // null finche' la partita non e' finita
     private final Label banner = new Label();
     private Scene roomScene;
 
@@ -117,6 +129,7 @@ public class GuiView implements View {
         title = new TitleScreen();
         title.setOnPlay(this::openRoomList);
         title.setOnCreateRoom(roomName -> inBackground(() -> controller.createAndJoin(roomName, Settings.nickname())));
+        title.setOnHistory(this::openHistory);
         title.setOnServerChanged(() -> inBackground(() -> {
             if (controller.connect(Settings.host(), Settings.port())) {
                 showMessage("Connesso a " + Settings.host() + ":" + Settings.port());
@@ -124,6 +137,28 @@ public class GuiView implements View {
         }));
         titleScene = new Scene(title, 1280, 720);
         titleScene.getStylesheets().add(stylesheet());
+    }
+
+    private void openHistory() {
+        if (historyPane == null) {
+            historyPane = new HistoryPane(() -> {
+                stage.setScene(titleScene);
+                title.showMenuNow();
+            });
+            historyScene = new Scene(historyPane, 1280, 720);
+            historyScene.getStylesheets().add(stylesheet());
+        }
+        historyPane.showLoading();
+        stage.setScene(historyScene);
+        inBackground(controller::requestHistory);
+    }
+
+    // fine partita: si esce dalla stanza (la connessione resta) e si torna al menu
+    private void goHome() {
+        inBackground(controller::leaveRoom);
+        scoresLayer.setVisible(false);
+        stage.setScene(titleScene);
+        title.showMenuNow();
     }
 
     private void openRoomList() {
@@ -215,20 +250,31 @@ public class GuiView implements View {
         logo.setFont(Theme.kanji(32));
         logo.setFill(Theme.VERMILION);
 
-        Button start = new Button("Start game");
+        Button start = startButton;
         start.setOnAction(e -> inBackground(controller::startGame));
-        Button endTurn = new Button("End turn");
+        Button endTurn = endTurnButton;
         endTurn.setOnAction(e -> {
             select(null);
             inBackground(controller::endTurn);
         });
-        Button quit = new Button("Quit");
+        Button quit = new Button("Esci");
         quit.getStyleClass().add("ghost");
         quit.setOnAction(e -> inBackground(controller::quit));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(14, logo, roomTitle, turnStatus, spacer, start, endTurn, quit);
+        scoresButton.getStyleClass().add("ghost");
+        scoresButton.setVisible(false);          // compare a fine partita, per riaprire la classifica
+        scoresButton.managedProperty().bind(scoresButton.visibleProperty());
+        scoresButton.setOnAction(e -> openScores());
+
+        homeButton.setVisible(false);
+        homeButton.setOnAction(e -> goHome());
+        for (Button button : new Button[] {start, endTurn, homeButton}) {
+            button.managedProperty().bind(button.visibleProperty());   // nascosti non occupano spazio
+        }
+
+        HBox header = new HBox(14, logo, roomTitle, turnStatus, spacer, scoresButton, start, endTurn, homeButton, quit);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("panel");
         header.setPadding(new Insets(8, 16, 8, 16));
@@ -239,12 +285,13 @@ public class GuiView implements View {
             inBackground(() -> controller.drawCard(position));
         });
         playerPanel.setOnTileSelected(this::select);
+        playerPanel.setOnSpendLucky(() -> inBackground(controller::spendLuckyCard));
         myPond.setOnHexClicked(this::placeSelected);
         myPond.setOnKoiClicked(id -> select(GameView.moveKey(id)));
         myPond.setGhostShape(this::ghostCells);
         myPond.setAutoFit(true);
         myPond.enableZoomAndPan();
-        Tooltip.install(myPond, new Tooltip("Mouse wheel: zoom   ·   drag: move   ·   double-click: reset view"));
+        Tooltip.install(myPond, new Tooltip("Rotellina: zoom   ·   trascina: sposta   ·   doppio clic: vista iniziale"));
 
         // centro: tabellone sopra, stagno sotto, suggerimento in fondo
         StackPane boardBox = new StackPane(board);
@@ -268,7 +315,7 @@ public class GuiView implements View {
         left.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
         // destra: gli altri stagni e i messaggi
-        Label othersTitle = new Label("Other ponds");
+        Label othersTitle = new Label("Altri stagni");
         othersTitle.getStyleClass().add("panel-title");
         ScrollPane othersScroll = new ScrollPane(opponents);
         othersScroll.setFitToWidth(true);
@@ -280,12 +327,12 @@ public class GuiView implements View {
         roomLog.setEditable(false);
         roomLog.setWrapText(true);
         roomLog.setPrefRowCount(9);
-        Label logTitle = new Label("Messages");
+        Label logTitle = new Label("Messaggi");
         logTitle.getStyleClass().add("panel-title");
         VBox log = new VBox(8, logTitle, roomLog);
         log.getStyleClass().add("panel");
 
-        Label objectivesTitle = new Label("Objectives");
+        Label objectivesTitle = new Label("Obiettivi");
         objectivesTitle.getStyleClass().add("panel-title");
         objectives.update(List.of());
         VBox objectivesBox = new VBox(8, objectivesTitle, objectives);
@@ -306,12 +353,14 @@ public class GuiView implements View {
         main.setPadding(new Insets(14));
 
         questionLayer.setVisible(false);
+        scoresLayer.setVisible(false);
 
         StackPane root = new StackPane(
                 new WavePattern(Theme.PAPER, Theme.TEAL.deriveColor(0, 1, 1, 0.15)),
                 main,
                 new SakuraLayer(12),
-                questionLayer);
+                questionLayer,
+                scoresLayer);
         // impaginato per 1340x780: su schermi piu' piccoli (o con il ridimensionamento di Windows) tutto si riduce insieme
         roomScene = new Scene(new FitToWindow(root, 1340, 780), 1360, 880);
         roomScene.getStylesheets().add(stylesheet());
@@ -452,20 +501,22 @@ public class GuiView implements View {
     }
 
     private void updateHint() {
-        if (lastView == null) {
-            hint.setText("Press Start when everyone has joined.");
+        if (finalRanking != null) {
+            hint.setText("La partita è finita: \"Classifica\" mostra di nuovo i punteggi.");
+        } else if (lastView == null) {
+            hint.setText("Premi Inizia quando ci sono tutti.");
         } else if (!lastView.isMyTurn()) {
-            hint.setText(lastView.question() != null ? lastView.question() : "Waiting for " + lastView.activePlayer() + "...");
+            hint.setText(lastView.question() != null ? lastView.question() : "Tocca a " + lastView.activePlayer() + "...");
         } else if (!placementQuestion().isEmpty()) {
-            hint.setText(lastView.question() + "   ·   click a highlighted hex");
+            hint.setText(lastView.question() + "   ·   clicca un esagono evidenziato");
         } else if (lastView.question() != null) {
             hint.setText(lastView.question());
         } else if (selectedType != null) {
-            String action = GameView.isMoveKey(selectedType) ? "move the " : "place the ";
-            hint.setText("Click a highlighted hex to " + action + PlayerPanel.readable(shapeOf(selectedType)).toLowerCase()
-                    + (rotatable(shapeOf(selectedType)) ? "   ·   R to rotate" : "") + "   ·   Esc to cancel");
+            String action = GameView.isMoveKey(selectedType) ? "spostare: " : "piazzare: ";
+            hint.setText("Clicca un esagono evidenziato per " + action + PlayerPanel.readable(shapeOf(selectedType)).toLowerCase()
+                    + (rotatable(shapeOf(selectedType)) ? "   ·   R per ruotare" : "") + "   ·   Esc per annullare");
         } else {
-            hint.setText("Meditate: take a card from the board.   Work: pick a tile from your storage, or click a koi to move it.   Then end your turn.");
+            hint.setText("Medita: prendi una carta dal tabellone.   Lavora: scegli una tessera dal magazzino, o clicca una carpa per spostarla.   Poi passa il turno.");
         }
     }
 
@@ -610,10 +661,16 @@ public class GuiView implements View {
     @Override
     public void showRoom(String roomId) {
         Platform.runLater(() -> {
-            roomTitle.setText("Room " + roomId);
-            turnStatus.setText("Waiting for everyone to press Start");
+            roomTitle.setText("Stanza " + roomId);
+            turnStatus.setText("In attesa che tutti premano Inizia");
             lastView = null;
             selectedType = null;
+            finalRanking = null;
+            scoresButton.setVisible(false);
+            scoresLayer.setVisible(false);
+            startButton.setVisible(true);
+            endTurnButton.setVisible(true);
+            homeButton.setVisible(false);
             roomLog.clear();
             updateHint();
             stage.setScene(roomScene);
@@ -628,7 +685,7 @@ public class GuiView implements View {
 
     @Override
     public void showError(String text) {
-        Platform.runLater(() -> show("Error: " + text));
+        Platform.runLater(() -> show("Errore: " + text));
     }
 
     @Override
@@ -639,7 +696,8 @@ public class GuiView implements View {
             if (selectedType != null && (view.positionsFor(selectedType).isEmpty() || !placementQuestion().isEmpty())) {
                 selectedType = null;
             }
-            turnStatus.setText(view.isMyTurn() ? "Your turn" : "Turn of " + view.activePlayer());
+            turnStatus.setText(finalRanking != null ? "Partita finita"
+                    : view.isMyTurn() ? "Tocca a te" : "Tocca a " + view.activePlayer());
             board.update(view.board(), view.canDraw());
             playerPanel.update(me(view), view.playablePositions().keySet(), selectedType);
             objectives.update(view.objectives());
@@ -647,8 +705,43 @@ public class GuiView implements View {
             refreshOpponents(view);
             refreshQuestion(view);
             updateHint();
-            if (turnChanged && view.activePlayer() != null) {
-                showBanner(view.isMyTurn() ? "Your turn" : view.activePlayer() + "'s turn");
+            if (turnChanged && view.activePlayer() != null && finalRanking == null) {
+                showBanner(view.isMyTurn() ? "Tocca a te" : "Tocca a " + view.activePlayer());
+            }
+        });
+    }
+
+    @Override
+    public void showGameOver(List<ScoreSheet> ranking) {
+        Platform.runLater(() -> {
+            finalRanking = ranking;
+            turnStatus.setText("Partita finita");
+            startButton.setVisible(false);
+            endTurnButton.setVisible(false);
+            homeButton.setVisible(true);
+            select(null);
+            updateHint();
+            scoresButton.setVisible(true);
+            openScores();
+        });
+    }
+
+    private void openScores() {
+        if (finalRanking == null) {
+            return;
+        }
+        String viewer = lastView != null ? lastView.viewer() : Settings.nickname();
+        scoresLayer.getChildren().setAll(new FinalScoresPane(finalRanking, viewer,
+                () -> scoresLayer.setVisible(false),
+                this::goHome));
+        scoresLayer.setVisible(true);
+    }
+
+    @Override
+    public void showHistory(List<MatchRecord> matches) {
+        Platform.runLater(() -> {
+            if (historyPane != null) {
+                historyPane.update(matches);
             }
         });
     }
@@ -658,6 +751,8 @@ public class GuiView implements View {
             roomLog.appendText(text + "\n");
         } else if (stage.getScene() == titleScene) {
             title.showToast(text);
+        } else if (historyScene != null && stage.getScene() == historyScene) {
+            historyPane.setStatus(text);
         } else {
             lobbyStatus.setText(text);
         }

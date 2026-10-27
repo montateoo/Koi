@@ -38,14 +38,16 @@ public class Objective {
         associatedTiles.remove(tile);
         claimedByPlayers.add(player);
         player.pay(objectiveType.cost());
+        player.addObjective(tile);   // unico punto in cui il giocatore registra le tessere obiettivo (servono al punteggio)
         return tile;
     }
 
     // testo dell'opzione: dice anche quale tessera si prende (utile per i rami)
     public String describeFor(Player player) {
-        String text = tileFor(player).getTileType().displayName();
+        String name = tileFor(player).getTileType().displayName();
+        String text = Character.toUpperCase(name.charAt(0)) + name.substring(1);   // "ponticello" -> "Ponticello"
         if (objectiveType.cost() > 0) {
-            text += " (" + objectiveType.cost() + " coins)";
+            text += " (" + objectiveType.cost() + " monete)";
         }
         return text;
     }

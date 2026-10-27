@@ -316,5 +316,12 @@ public class Player implements Worker{
         return !(myPond.findKoi(koiId).isEmpty());
     }
 
+    public void payLuckyCard() {
+        inventory.payLuckyCard();
+    }
+
+    public List<ScrollCard> getScrolls() {
+        return inventory.getScrolls();
+    }
 
 }

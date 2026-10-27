@@ -17,7 +17,7 @@ import javafx.scene.shape.Polygon;
 import network.ObjectiveView;
 
 // i tre obiettivi sul tavolo: disegno, nome, costo, requisito e tessere rimaste;
-// bordo dorato e "Claimable" quando chi guarda lo puo' reclamare a fine turno
+// bordo dorato e "Reclamabile" quando chi guarda lo puo' reclamare a fine turno
 final class ObjectivesPane extends VBox {
 
     private static final double ICON = 54;   // lato del riquadro del disegno, in pixel
@@ -29,7 +29,7 @@ final class ObjectivesPane extends VBox {
     void update(List<ObjectiveView> objectives) {
         getChildren().clear();
         if (objectives.isEmpty()) {
-            Label waiting = new Label("Revealed when the game starts");
+            Label waiting = new Label("Si scoprono all'inizio della partita");
             waiting.getStyleClass().add("muted");
             getChildren().add(waiting);
             return;
@@ -53,7 +53,7 @@ final class ObjectivesPane extends VBox {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         title.getChildren().add(spacer);
         if (objective.claimable()) {
-            Label badge = new Label("Claimable");
+            Label badge = new Label("Reclamabile");
             badge.setStyle("-fx-text-fill: #fbf7ec; -fx-background-color: #c8341f; -fx-background-radius: 3;"
                     + " -fx-padding: 1 5 1 5; -fx-font-size: 11px;");
             title.getChildren().add(badge);
@@ -64,8 +64,8 @@ final class ObjectivesPane extends VBox {
         requirement.getStyleClass().add("muted");
         requirement.setStyle("-fx-font-size: 11px;");
 
-        Label left = new Label(objective.tilesLeft() == 0 ? "All taken"
-                : objective.tilesLeft() + (objective.tilesLeft() == 1 ? " tile left" : " tiles left"));
+        Label left = new Label(objective.tilesLeft() == 0 ? "Finite"
+                : objective.tilesLeft() + (objective.tilesLeft() == 1 ? " tessera rimasta" : " tessere rimaste"));
         left.getStyleClass().add("muted");
         left.setStyle("-fx-font-size: 11px;");
 

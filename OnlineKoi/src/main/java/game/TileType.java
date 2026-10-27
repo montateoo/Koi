@@ -1,27 +1,27 @@
 package game;
 
 public enum TileType {
-    WATERSOURCE("water source"){@Override public boolean isTopTile(){return false;}},
-    WATER("water"){@Override public boolean isTopTile(){return false;}},
-    LEAF("leaf"){@Override public boolean isTopTile(){return false;}},
-    LILY("lily"){@Override public boolean isTopTile(){return true;}},
-    BORDER("border"){@Override public boolean isTopTile(){return false;}},
-    LANTERN("lantern"){@Override public boolean isTopTile(){return true;}},
-    BIGKOI("big koi"){@Override public boolean isTopTile(){return true;}},
-    MEDIUMKOI("medium koi"){@Override public boolean isTopTile(){return true;}},
-    SMALLKOI("small koi"){@Override public boolean isTopTile(){return true;}},
-    SMALLBRANCH("small branch"){@Override public boolean isTopTile(){return true;}},
-    MEDIUMBRANCH("medium branch"){@Override public boolean isTopTile(){return true;}},
-    BIGBRANCH("big branch"){@Override public boolean isTopTile(){return true;}},
-    TURTLE("turtle"){@Override public boolean isTopTile(){return true;}},
-    THREE("three"){@Override public boolean isTopTile(){return false;}},
-    WATERFALL("waterfall"){@Override public boolean isTopTile(){return false;}},
-    BRIDGE("bridge"){@Override public boolean isTopTile(){return false;}},
-    STATUE("statue"){@Override public boolean isTopTile(){return false;}},
-    SHISHIODOSHI("shishiodoshi"){@Override public boolean isTopTile(){return true;}},
-    PURPLELILY("purplelily"){@Override public boolean isTopTile(){return true;}},
-    PATH("path"){@Override public boolean isTopTile(){return true;}},
-    OLDCARP("oldcarp"){@Override public boolean isTopTile(){return true;}};
+    WATERSOURCE("sorgente"){@Override public boolean isTopTile(){return false;}},
+    WATER("acqua"){@Override public boolean isTopTile(){return false;}},
+    LEAF("fogliame"){@Override public boolean isTopTile(){return false;}},
+    LILY("ninfea"){@Override public boolean isTopTile(){return true;}},
+    BORDER("sponda"){@Override public boolean isTopTile(){return false;}},
+    LANTERN("lanterna"){@Override public boolean isTopTile(){return true;}},
+    BIGKOI("carpa grande"){@Override public boolean isTopTile(){return true;}},
+    MEDIUMKOI("carpa media"){@Override public boolean isTopTile(){return true;}},
+    SMALLKOI("carpa piccola"){@Override public boolean isTopTile(){return true;}},
+    SMALLBRANCH("ramo piccolo"){@Override public boolean isTopTile(){return true;}},
+    MEDIUMBRANCH("ramo medio"){@Override public boolean isTopTile(){return true;}},
+    BIGBRANCH("ramo grande"){@Override public boolean isTopTile(){return true;}},
+    TURTLE("tartaruga"){@Override public boolean isTopTile(){return true;}},
+    THREE("salice piangente"){@Override public boolean isTopTile(){return false;}},
+    WATERFALL("cascata"){@Override public boolean isTopTile(){return false;}},
+    BRIDGE("ponticello"){@Override public boolean isTopTile(){return false;}},
+    STATUE("statua"){@Override public boolean isTopTile(){return false;}},
+    SHISHIODOSHI("shishi odoshi"){@Override public boolean isTopTile(){return true;}},
+    PURPLELILY("ninfea viola"){@Override public boolean isTopTile(){return true;}},
+    PATH("percorso"){@Override public boolean isTopTile(){return true;}},
+    OLDCARP("carpa centenaria"){@Override public boolean isTopTile(){return true;}};
 
     private final String displayName;   // nome leggibile da mostrare nei messaggi ai giocatori
 

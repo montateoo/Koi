@@ -57,6 +57,7 @@ final class TitleScreen extends StackPane {
     private Runnable onPlay = () -> { };
     private Consumer<String> onCreateRoom = name -> { };
     private Runnable onServerChanged = () -> { };
+    private Runnable onHistory = () -> { };
 
     TitleScreen() {
         // sfondo "a riempimento": copre tutta la finestra senza deformarsi, l'eccesso si taglia
@@ -116,6 +117,10 @@ final class TitleScreen extends StackPane {
 
     void setOnCreateRoom(Consumer<String> action) {
         this.onCreateRoom = action;
+    }
+
+    void setOnHistory(Runnable action) {
+        this.onHistory = action;
     }
 
     void setOnServerChanged(Runnable action) {
@@ -227,10 +232,12 @@ final class TitleScreen extends StackPane {
         play.setOnAction(e -> withNickname(onPlay));
         Button create = menuButton("Crea Stanza");
         create.setOnAction(e -> withNickname(this::askRoomName));
+        Button history = menuButton("Storico");
+        history.setOnAction(e -> onHistory.run());
         Button settings = menuButton("Impostazioni");
         settings.setOnAction(e -> openSettings());
 
-        VBox buttons = new VBox(12, play, create, settings);
+        VBox buttons = new VBox(12, play, create, history, settings);
         buttons.setAlignment(Pos.CENTER);
 
         VBox box = new VBox(6, kanji, title, spacer(18), buttons);

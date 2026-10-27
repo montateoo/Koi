@@ -25,11 +25,11 @@ public class RainCard extends Card {
 
     @Override
     public String describe() {
-        ArrayList<TileType> types = new ArrayList<>();
+        ArrayList<String> types = new ArrayList<>();
         for (Tile tile : rainTiles) {
-            types.add(tile.getTileType());
+            types.add(tile.getTileType().displayName());
         }
-        return "Rain: " + types;
+        return "Pioggia: " + types;   // "Pioggia: [acqua, acqua, fogliame]": il tabellone le conta
     }
     
 }

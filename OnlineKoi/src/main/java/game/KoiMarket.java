@@ -16,6 +16,18 @@ public class KoiMarket {
     private final int smallKoiCost = 1;
     private final int mediumKoiCost = 2;
     private final int bigKoiCost = 3;
+    private GameRoom listener;
+
+    private ArrayList<KoiCarp> smallKoiCarps;
+    private ArrayList<KoiCarp> mediumKoiCarps;
+    private ArrayList<KoiCarp> bigKoiCarps;
+    
+    public KoiMarket(){
+        smallKoiCarps = new ArrayList<>();
+        mediumKoiCarps = new ArrayList<>();
+        bigKoiCarps = new ArrayList<>();
+
+    }
 
     public int getSmallKoiCost() {
         return smallKoiCost;
@@ -27,16 +39,6 @@ public class KoiMarket {
 
     public int getBigKoiCost() {
         return bigKoiCost;
-    }
-
-    private ArrayList<KoiCarp> smallKoiCarps;
-    private ArrayList<KoiCarp> mediumKoiCarps;
-    private ArrayList<KoiCarp> bigKoiCarps;
-
-    public KoiMarket(){
-        smallKoiCarps = new ArrayList<>();
-        mediumKoiCarps = new ArrayList<>();
-        bigKoiCarps = new ArrayList<>();
     }
 
     private void loadKoiCarps(){
@@ -127,15 +129,49 @@ public class KoiMarket {
     }
 
     public Tile takeSmallKoi() {
-        return smallKoiCarps.removeFirst();
+        Tile koi = smallKoiCarps.removeFirst();
+        checkEmpty();
+        return koi;
     }
 
     public Tile takeMediumKoi() {
-       return mediumKoiCarps.removeFirst();
+        Tile koi = mediumKoiCarps.removeFirst();
+        checkEmpty();
+        return koi;
     }
 
     public Tile takeBigKoi() {
-        return bigKoiCarps.removeFirst();
+        Tile koi = bigKoiCarps.removeFirst();
+        checkEmpty();
+        return koi;
     }
+
+    // carpa scartata dal magazzino a fine turno: torna sul mercato
+    public void giveBack(Tile koi) {
+        switch (koi.getTileType()) {
+            case SMALLKOI:
+                smallKoiCarps.add((KoiCarp) koi);
+                break;
+            case MEDIUMKOI:
+                mediumKoiCarps.add((KoiCarp) koi);
+                break;
+            case BIGKOI:
+                bigKoiCarps.add((KoiCarp) koi);
+                break;
+            default:
+                throw new IllegalArgumentException(koi.getTileType() + " is not a koi");
+        }
+    }
+
+    // regolamento pag. 11: la fine scatta quando viene presa l'ultima carpa della riserva
+    private void checkEmpty() {
+        if (smallKoiCarps.isEmpty() && mediumKoiCarps.isEmpty() && bigKoiCarps.isEmpty()) {
+            listener.noMoreKoi();
+        }
+    }
+
+	public void setListener(GameRoom gameRoom) {
+		listener = gameRoom;
+	}
 
 }

@@ -14,6 +14,6 @@ public class WarehouseCard extends Card {
 
     @Override
     public String describe() {
-        return "Warehouse: +" + additionalSpace + " storage";
+        return "Magazzino: +" + additionalSpace + " spazi";
     }
 }

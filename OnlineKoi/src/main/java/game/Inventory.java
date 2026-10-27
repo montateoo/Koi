@@ -15,7 +15,7 @@ public class Inventory{
     private ArrayList<Card> myCards;
     private ArrayList<ScrollCard> myScrolls;
     private int coins;
-    private int LuckyCards;
+    private int luckyCards;
 
     public Inventory(){
         this.maxSpace = startingSpace;
@@ -32,17 +32,19 @@ public class Inventory{
         }
     }
 
+    // durante il turno il magazzino puo' superare la capienza: si controlla solo a fine turno
+    // (GameRoom.askStorageDiscard fa scartare il giocatore finche' non ci sta)
     public void addTile(Tile newTile) {
-        if(spaceLeft - newTile.getSpaceOccupied() >= 0){
-            myTiles.add(newTile);
-            spaceLeft = spaceLeft - newTile.getSpaceOccupied();
-        }else{
-                //TODO gestire lo scarto delle tessere
-        }
+        myTiles.add(newTile);
+        spaceLeft = spaceLeft - newTile.getSpaceOccupied();
+    }
+
+    public boolean isOverCapacity() {
+        return spaceLeft < 0;
     }
 
 	public void addLuckyCard() {
-        LuckyCards++;
+        luckyCards++;
 	}
 
 	public void addMoney(int i) {
@@ -70,7 +72,7 @@ public class Inventory{
     }
 
     public int getLuckyCards() {
-        return LuckyCards;
+        return luckyCards;
     }
 
     public int getMaxSpace() {
@@ -155,5 +157,13 @@ public class Inventory{
             }
         }
         return count;
+    }
+
+    public boolean hasLuckyCard() {
+        return luckyCards>0;
+    }
+
+    public void payLuckyCard() {
+        luckyCards--;
     }
 }

@@ -20,6 +20,7 @@ public class Board {
 
     private ArrayList<Card> drawableCards;
     private ArrayList<Card> deckOfCards;
+    private boolean emptyDeck;
     final int boardSize = 5;
     final int firstCardCost = 1;
     final int thirdBonusMoney = 2;
@@ -33,6 +34,7 @@ public class Board {
     public Board(){
         drawableCards = new ArrayList<>(boardSize);
         deckOfCards = new ArrayList<>();
+        emptyDeck = false;
     }
 
     public void setListener(BoardListener listener) {
@@ -126,10 +128,30 @@ public class Board {
         }
     }
 
+    // regolamento pag. 6: le carte a sinistra di quella presa scorrono a destra, lo spazio piu' a sinistra si libera
+    // e si riempie dal mazzo; a mazzo finito resta vuoto (null), cosi' ogni carta resta sotto il suo costo/bonus
     public void updateBoard(){
 
-        drawableCards.add(0,deckOfCards.removeFirst());      
+        if(!emptyDeck){
+            drawableCards.add(0,deckOfCards.removeFirst());
+        } else {
+            drawableCards.add(0, null);
+        }
 
+        if(!emptyDeck && deckOfCards.size()==0){
+            emptyDeck();
+        }
+
+    }
+
+    // c'e' ancora almeno una carta da pescare sul tabellone
+    public boolean hasCards() {
+        for (Card card : drawableCards) {
+            if (card != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Card drawCard(int position){
@@ -161,10 +183,16 @@ public class Board {
         String text = "";
 
         for(int i = 0; i<boardSize; i++){
-            text = text + drawableCards.get(i).toString() + "|";
+            Card card = drawableCards.get(i);
+            text = text + (card == null ? "(empty)" : card.toString()) + "|";
         }
 
         return text;
+    }
+
+    private void emptyDeck(){
+        emptyDeck = true;
+        listener.noMoreCards();
     }
 
 

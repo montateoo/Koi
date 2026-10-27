@@ -23,6 +23,6 @@ public class WellCard extends Card {
 
     @Override
     public String describe() {
-        return "Well: " + carriedMoney + " coins " + (both ? "and " : "or ") + carriedWater + " water";
+        return "Pozzo: " + carriedMoney + (carriedMoney == 1 ? " moneta " : " monete ") + (both ? "e " : "o ") + carriedWater + " acqua";
     }
 }

@@ -10,7 +10,7 @@ import game.cards.CardType;
 
 public enum ObjectiveType {
 
-    BRANCHES(0) {
+    BRANCHES(0, 10, 15, 20) {               // punti: ramo piccolo, medio, grande
         @Override
         public boolean isSatisfiedBy(Player player){
             for (TileType size : BRANCH_SIZES) {
@@ -37,57 +37,57 @@ public enum ObjectiveType {
             return null;
         }
     },
-    TURTLE(0) {
+    TURTLE(0, 0, 1, 2, 4, 8, 12, 16) {      // punti con 0..6 acque libere adiacenti
         @Override
         public boolean isSatisfiedBy(Player player){
             return player.countCards(CardType.SCROLL) >=3 && player.countFreeWater() >= 1;
         }
     },
-    THREE(0) {
+    THREE(0, 8) {
         @Override
         public boolean isSatisfiedBy(Player player){
             return player.countKoi() >=5 && !player.getPlayablePositions(TileType.THREE).isEmpty();
         }
     },
-    WATERFALL(0) {
+    WATERFALL(0, 8, 16) {                   // punti: normale, sorgente completamente occupata
         @Override
         public boolean isSatisfiedBy(Player player){
             return player.countCards(CardType.WELL) >= 2
                     && !player.getPlayablePositions(TileType.WATERFALL).isEmpty();
         }
     },
-    BRIDGE(3) {
+    BRIDGE(3, 1) {                          // punti per esagono in linea davanti
         @Override
         public boolean isSatisfiedBy(Player player) {
             return player.countTops(TileType.LANTERN) >= 1 && !player.getPlayablePositions(TileType.BRIDGE).isEmpty();
         }
     },
-    STATUE(0) {
+    STATUE(0, 4) {                          // punti per carpa in linea davanti
         @Override
         public boolean isSatisfiedBy(Player player) {
             return player.countTops(TileType.LANTERN) >= 2 && !player.getPlayablePositions(TileType.STATUE).isEmpty();
         }
     },
-    SHISHIODOSHI(0) {
+    SHISHIODOSHI(0, 3) {                    // punti per carpa adiacente
         @Override
         public boolean isSatisfiedBy(Player player) {
             return player.hasShape(ObjectiveShapes.SHISHI_ODOSHI, false);
         }
     },
-    PURPLELILY(0) {
+    PURPLELILY(0, 2) {                      // bonus a ogni carpa adiacente (una ninfea normale da' 1)
         @Override
         public boolean isSatisfiedBy(Player player) {
             return player.countTops(TileType.LILY) >= 2 && player.countFreeWater() >= 1 && player.hasAdjacentTops(TileType.LILY);
         }
     },
-    PATH(2) {
+    PATH(2, 0, 3, 6, 12, 18) {              // punti con 0..4+ tessere
         // basta un posto dove mettere la tessera; si reclama piazzando una carpa (vedi GameRoom.offerPath)
         @Override
         public boolean isSatisfiedBy(Player player) {
             return !player.getPlayablePositions(TileType.PATH).isEmpty();
         }
     },
-    OLDCARP(5) {
+    OLDCARP(5, 8) {                         // valore base, poi come le carpe normali
         @Override
         public boolean isSatisfiedBy(Player player) {
             return player.hasShape(ObjectiveShapes.OLD_CARP, true);
@@ -105,43 +105,57 @@ public enum ObjectiveType {
     private final int maxPaths = 7;
     private final int maxOldCarps = 2;
 
-    ObjectiveType(int cost) {
+    private final int[] points;   // i valori stampati sulla carta (regolamento pag. 13): li usa ScoreCalculator
+
+    ObjectiveType(int cost, int... points) {
         this.cost = cost;
+        this.points = points;
     }
 
     public int cost() {
         return cost;
     }
 
+    // valore alla posizione i della tabella dei punti; oltre la fine vale l'ultimo
+    // (percorso con 5 tessere = come 4+, cioe' 18)
+    public int points(int i) {
+        return points[Math.min(i, points.length - 1)];
+    }
+
+    // per gli obiettivi con un solo valore (salice, statua, shishi odoshi...)
+    public int points() {
+        return points(0);
+    }
+
     // nome da mostrare ai giocatori
     public String displayName() {
         switch (this) {
-            case BRANCHES:     return "Branches";
-            case TURTLE:       return "Turtle";
-            case THREE:        return "Weeping willow";
-            case WATERFALL:    return "Waterfall";
-            case BRIDGE:       return "Bridge";
-            case STATUE:       return "Statue";
+            case BRANCHES:     return "Rami";
+            case TURTLE:       return "Tartaruga";
+            case THREE:        return "Salice piangente";
+            case WATERFALL:    return "Cascata";
+            case BRIDGE:       return "Ponticello";
+            case STATUE:       return "Statua";
             case SHISHIODOSHI: return "Shishi odoshi";
-            case PURPLELILY:   return "Purple lily";
-            case PATH:         return "Path";
-            default:           return "Old carp";
+            case PURPLELILY:   return "Ninfea viola";
+            case PATH:         return "Percorso";
+            default:           return "Carpa centenaria";
         }
     }
 
     // requisito in breve, come sulla carta obiettivo (il costo in monete si mostra a parte)
     public String requirement() {
         switch (this) {
-            case BRANCHES:     return "Free water in a branch shape + 2/3/4 leaves (small/medium/big)";
-            case TURTLE:       return "3 scroll cards + 1 free water";
-            case THREE:        return "5 koi in your pond";
-            case WATERFALL:    return "2 well cards; placed facing the source";
-            case BRIDGE:       return "1 lantern; placed next to a border with a lantern";
-            case STATUE:       return "2 lanterns";
-            case SHISHIODOSHI: return "3 free water in a triangle (not the source)";
-            case PURPLELILY:   return "2 adjacent lilies + 1 free water";
-            case PATH:         return "Claim it when you place a koi; extend the path each time";
-            default:           return "4 free water in the old carp shape";
+            case BRANCHES:     return "Acqua libera a forma di ramo + 2/3/4 fogliami (piccolo/medio/grande)";
+            case TURTLE:       return "3 carte Pergamena + 1 acqua libera";
+            case THREE:        return "5 carpe nel tuo stagno";
+            case WATERFALL:    return "2 carte Pozzo; va piazzata davanti alla Sorgente";
+            case BRIDGE:       return "1 lanterna; va piazzato accanto a una sponda con la lanterna";
+            case STATUE:       return "2 lanterne";
+            case SHISHIODOSHI: return "3 acque libere a triangolo (non della Sorgente)";
+            case PURPLELILY:   return "2 ninfee adiacenti + 1 acqua libera";
+            case PATH:         return "Si reclama piazzando una carpa; ogni tessera allunga il percorso";
+            default:           return "4 acque libere a forma di carpa centenaria";
         }
     }
 
@@ -303,4 +317,5 @@ public enum ObjectiveType {
 
         return new Objective(OLDCARP,associatedTiles);     
     }
+
 }

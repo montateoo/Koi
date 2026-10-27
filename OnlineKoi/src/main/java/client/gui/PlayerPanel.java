@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -20,6 +21,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Polygon;
 import javafx.scene.text.Text;
+import game.TileType;
 import network.PlayerView;
 
 // la "plancia Sensei" del giocatore: monete, fortuna, magazzino a esagoni di legno, aiutanti e pergamene.
@@ -27,12 +29,18 @@ import network.PlayerView;
 public class PlayerPanel extends VBox {
 
     private Consumer<String> onTileSelected = type -> { };
+    private Runnable onSpendLucky = () -> { };
 
     public PlayerPanel() {
         setSpacing(12);
         getStyleClass().add("panel");
         setPrefWidth(270);
         setMinWidth(270);
+    }
+
+    // clic sui segnalini Fortuna: chiede al server di spenderne uno (le opzioni arrivano come domanda)
+    public void setOnSpendLucky(Runnable handler) {
+        this.onSpendLucky = handler;
     }
 
     public void setOnTileSelected(Consumer<String> handler) {
@@ -48,30 +56,30 @@ public class PlayerPanel extends VBox {
         name.setFill(Theme.INK);
 
         HBox wealth = new HBox(16,
-                withCount(KoiArt.coin(11), me.coins(), "coins"),
-                withCount(KoiArt.fortune(11), me.luckyCards(), "fortune tokens"));
+                withCount(KoiArt.coin(11), me.coins(), "monete"),
+                fortune(me.luckyCards()));
         wealth.setAlignment(Pos.CENTER_LEFT);
 
-        getChildren().addAll(name, wealth, sectionTitle("Storage  " + me.storageUsed() + "/" + me.storageMax()),
+        getChildren().addAll(name, wealth, sectionTitle("Magazzino  " + me.storageUsed() + "/" + me.storageMax()),
                 storageSlots(me.storageUsed(), me.storageMax()), tiles(me.tiles(), placeable, selected));
 
         if (!me.helpers().isEmpty()) {
-            getChildren().add(sectionTitle("Helpers"));
+            getChildren().add(sectionTitle("Aiutanti"));
             for (String helper : me.helpers()) {
-                // "Helper: [PLACEWATER] usesLeft: 1/2" -> "place up to 2 water   (1/2 left this turn)"
-                String uses = helper.contains("usesLeft:") ? helper.substring(helper.indexOf("usesLeft:") + 9).trim() : "";
-                String text = BoardPane.prettify(helper.replace("Helper:", "").trim()).replace("\n", " ");
-                getChildren().add(cardLine("助", text + (uses.isEmpty() ? "" : "   (" + uses + " left)"), Theme.TEAL_DEEP));
+                // "Aiutante: piazza fino a 2 acque | usi: 1/2" -> "piazza fino a 2 acque   (1/2 in questo turno)"
+                String uses = helper.contains("usi:") ? helper.substring(helper.indexOf("usi:") + 4).trim() : "";
+                String text = BoardPane.prettify(helper.replace("Aiutante:", "").trim()).replace("\n", " ");
+                getChildren().add(cardLine("助", text + (uses.isEmpty() ? "" : "   (" + uses + " in questo turno)"), Theme.TEAL_DEEP));
             }
         }
         if (!me.scrolls().isEmpty()) {
-            getChildren().add(sectionTitle("Scrolls"));
+            getChildren().add(sectionTitle("Pergamene"));
             for (String scroll : me.scrolls()) {
-                getChildren().add(cardLine("巻", scroll.replace("Scroll:", "").trim(), Theme.VERMILION));
+                getChildren().add(cardLine("巻", scroll.replace("Pergamena:", "").trim(), Theme.VERMILION));
             }
         }
         if (!me.cards().isEmpty()) {
-            getChildren().add(sectionTitle("Cards"));
+            getChildren().add(sectionTitle("Carte"));
             for (String card : me.cards()) {
                 getChildren().add(cardLine("札", card, Theme.INK_SOFT));
             }
@@ -82,6 +90,17 @@ public class PlayerPanel extends VBox {
         Label label = new Label(text);
         label.getStyleClass().add("panel-title");
         return label;
+    }
+
+    // segnalini Fortuna: cliccabili quando ce n'e' almeno uno
+    private Node fortune(int count) {
+        Node box = withCount(KoiArt.fortune(11), count, "segnalini Fortuna");
+        if (count > 0) {
+            box.setCursor(Cursor.HAND);
+            box.setOnMouseClicked(e -> onSpendLucky.run());
+            Tooltip.install(box, new Tooltip("Clicca per spendere un segnalino Fortuna: 1 fogliame, 2 acqua, 1 sponda o una carpa a +1 moneta"));
+        }
+        return box;
     }
 
     private Node withCount(Node icon, int count, String tooltip) {
@@ -97,9 +116,10 @@ public class PlayerPanel extends VBox {
     // il magazzino come sulla plancia: esagoni di legno, scuri quelli occupati
     private Node storageSlots(int used, int max) {
         HBox slots = new HBox(3);
-        for (int i = 0; i < max; i++) {
+        // oltre la capienza (possibile durante il turno) gli esagoni in piu' sono vermigli: a fine turno si scarta
+        for (int i = 0; i < Math.max(used, max); i++) {
             Polygon slot = KoiArt.hexagon(0, 0, 11);
-            slot.setFill(i < used ? Theme.WOOD_DARK : Theme.WOOD.deriveColor(0, 0.8, 1.25, 0.6));
+            slot.setFill(i >= max ? Theme.VERMILION : i < used ? Theme.WOOD_DARK : Theme.WOOD.deriveColor(0, 0.8, 1.25, 0.6));
             slot.setStroke(Theme.WOOD_DARK);
             slots.getChildren().add(slot);
         }
@@ -120,7 +140,7 @@ public class PlayerPanel extends VBox {
 
         FlowPane tokens = new FlowPane(10, 10);
         if (counts.isEmpty()) {
-            Label empty = new Label("empty");
+            Label empty = new Label("vuoto");
             empty.getStyleClass().add("muted");
             tokens.getChildren().add(empty);
         }
@@ -133,13 +153,13 @@ public class PlayerPanel extends VBox {
 
     private Node token(String type, int count, boolean placeable, boolean selected) {
         Group icon = new Group(KoiArt.tileIcon(type, 21));
-        Text badge = new Text(count == 0 ? "reserve" : "× " + count);
+        Text badge = new Text(count == 0 ? "riserva" : "× " + count);
         badge.setFont(Theme.serif(11));
         badge.setFill(Theme.INK);
         VBox token = new VBox(2, icon, badge);
         token.setAlignment(Pos.CENTER);
         token.setPadding(new Insets(4));
-        Tooltip.install(token, new Tooltip(readable(type) + (placeable ? "  (click, then click a highlighted hex)" : "")));
+        Tooltip.install(token, new Tooltip(readable(type) + (placeable ? "  (clicca, poi clicca un esagono evidenziato)" : "")));
 
         if (selected) {
             token.setStyle("-fx-background-color: rgba(212,161,58,0.35); -fx-background-radius: 8;");
@@ -171,29 +191,13 @@ public class PlayerPanel extends VBox {
         return line;
     }
 
+    // nome da mostrare di un tipo di tessera ("MEDIUMKOI" -> "Carpa media"): viene da TileType, un solo posto
     static String readable(String type) {
-        switch (type) {
-            case "WATER":     return "Water";
-            case "LEAF":      return "Leaf";
-            case "LILY":      return "Lily";
-            case "BORDER":    return "Border";
-            case "LANTERN":   return "Lantern";
-            case "SMALLKOI":  return "Small koi";
-            case "MEDIUMKOI": return "Medium koi";
-            case "BIGKOI":    return "Big koi";
-            case "SMALLBRANCH":  return "Small branch";
-            case "MEDIUMBRANCH": return "Medium branch";
-            case "BIGBRANCH":    return "Big branch";
-            case "SHISHIODOSHI": return "Shishi odoshi";
-            case "OLDCARP":      return "Old carp";
-            case "PURPLELILY":   return "Purple lily";
-            case "TURTLE":       return "Turtle";
-            case "THREE":        return "Weeping willow";
-            case "WATERFALL":    return "Waterfall";
-            case "BRIDGE":       return "Bridge";
-            case "STATUE":       return "Statue";
-            case "PATH":         return "Path";
-            default:          return type.toLowerCase();
+        try {
+            String name = TileType.valueOf(type).displayName();
+            return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        } catch (IllegalArgumentException e) {
+            return type.toLowerCase();
         }
     }
 
@@ -205,7 +209,7 @@ public class PlayerPanel extends VBox {
         HBox stats = new HBox(10,
                 small(KoiArt.coin(7), player.coins()),
                 small(KoiArt.fortune(7), player.luckyCards()),
-                new Label("storage " + player.storageUsed() + "/" + player.storageMax()));
+                new Label("magazzino " + player.storageUsed() + "/" + player.storageMax()));
         stats.setAlignment(Pos.CENTER_LEFT);
         return new VBox(2, name, stats);
     }

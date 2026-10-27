@@ -14,7 +14,7 @@ public class MarketCard extends Card {
 
     @Override
     public String describe() {
-        return "Market: koi discount " + discount;
+        return "Mercato: carpa scontata di " + discount + (discount == 1 ? " moneta" : " monete");
     }
     
 }

@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -384,6 +385,116 @@ public class Pond {
 		return koi.size();
 	}
 
+    // tessere che stanno sopra l'acqua, raggruppate per tessera: id -> esagoni coperti
+    // (una carpa grande copre tre esagoni ma e' una sola tessera)
+    public Map<Integer, List<HexPosition>> topPieces(TileType... types) {
+        Set<TileType> wanted = Set.of(types);
+        Map<Integer, List<HexPosition>> pieces = new LinkedHashMap<>();
+        for (Map.Entry<HexPosition, Cell> entry : cells.entrySet()) {
+            Tile top = entry.getValue().getTop();
+            if (top != null && wanted.contains(top.getTileType())) {
+                pieces.computeIfAbsent(top.getTileID(), id -> new ArrayList<>()).add(entry.getKey());
+            }
+        }
+        return pieces;
+    }
+
+    // pezzi di laghetto (la tessera di base: statua, ponticello, cascata, salice...), raggruppati per tessera
+    public Map<Integer, List<HexPosition>> basePieces(TileType... types) {
+        Set<TileType> wanted = Set.of(types);
+        Map<Integer, List<HexPosition>> pieces = new LinkedHashMap<>();
+        for (Map.Entry<HexPosition, Cell> entry : cells.entrySet()) {
+            Tile base = entry.getValue().getBase();
+            if (wanted.contains(base.getTileType())) {
+                pieces.computeIfAbsent(base.getTileID(), id -> new ArrayList<>()).add(entry.getKey());
+            }
+        }
+        return pieces;
+    }
+
+    // gli esagoni del laghetto attorno a un pezzo (esclusi quelli del pezzo stesso), ognuno una volta sola
+    public Set<HexPosition> neighboursOf(List<HexPosition> piece) {
+        Set<HexPosition> around = new LinkedHashSet<>();
+        for (HexPosition position : piece) {
+            for (HexPosition next : position.neighbours()) {
+                if (cells.containsKey(next) && !piece.contains(next)) {
+                    around.add(next);
+                }
+            }
+        }
+        return around;
+    }
+
+    // il pezzo e' completamente circondato da lati azzurri: ogni suo lato esterno tocca una tessera
+    // che da quella parte e' azzurra (un buco o un lato di roccia lo impediscono)
+    public boolean surroundedByBlue(List<HexPosition> piece) {
+        for (HexPosition position : piece) {
+            for (int d = 0; d < 6; d++) {
+                HexPosition next = position.neighbour(d);
+                if (piece.contains(next)) {
+                    continue;   // lato interno tra due esagoni dello stesso pezzo
+                }
+                Cell neighbour = cells.get(next);
+                if (neighbour == null || !neighbour.isBlue((d + 3) % 6)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // direzione verso cui guarda il centro di un pezzo tipo sponda (sponda, statua, ponticello, cascata):
+    // e' il suo unico lato azzurro. -1 se in quella posizione non c'e' un centro di sponda
+    public int facing(HexPosition center) {
+        Cell cell = cells.get(center);
+        if (cell == null) {
+            return -1;
+        }
+        int found = -1;
+        for (int side = 0; side < 6; side++) {
+            if (cell.isBlue(side)) {
+                if (found != -1) {
+                    return -1;   // piu' lati azzurri: non e' il centro di una sponda
+                }
+                found = side;
+            }
+        }
+        return found;
+    }
+
+    // quanti esagoni del laghetto ci sono sulla semiretta che parte da start (escluso) nella direzione data
+    public int countInLine(HexPosition start, int direction) {
+        return lineFrom(start, direction).size();
+    }
+
+    // gli esagoni del laghetto sulla semiretta che parte da start (escluso) nella direzione data, in ordine.
+    // Qualunque tessera conta, e i buchi non fermano la linea: si prosegue finche' si esce dai limiti dello stagno,
+    // oltre i quali non puo' esserci piu' nulla (lungo una direzione ogni coordinata cambia sempre nello stesso verso)
+    public List<HexPosition> lineFrom(HexPosition start, int direction) {
+        List<HexPosition> line = new ArrayList<>();
+        if (direction < 0 || cells.isEmpty()) {
+            return line;
+        }
+        int minQ = Integer.MAX_VALUE, maxQ = Integer.MIN_VALUE;
+        int minR = Integer.MAX_VALUE, maxR = Integer.MIN_VALUE;
+        int minS = Integer.MAX_VALUE, maxS = Integer.MIN_VALUE;
+        for (HexPosition p : cells.keySet()) {
+            int s = -p.q() - p.r();
+            minQ = Math.min(minQ, p.q()); maxQ = Math.max(maxQ, p.q());
+            minR = Math.min(minR, p.r()); maxR = Math.max(maxR, p.r());
+            minS = Math.min(minS, s);     maxS = Math.max(maxS, s);
+        }
+        HexPosition p = start.neighbour(direction);
+        while (p.q() >= minQ && p.q() <= maxQ && p.r() >= minR && p.r() <= maxR
+                && -p.q() - p.r() >= minS && -p.q() - p.r() <= maxS) {
+            if (cells.containsKey(p)) {
+                line.add(p);
+            }
+            p = p.neighbour(direction);
+        }
+        return line;
+    }
+
     public int countTops(TileType type) {
         Set<Integer> tops = new HashSet<>();
 
@@ -623,5 +734,28 @@ public class Pond {
             cells.put(piece.get(i), new Cell(tile, sides(rotation, type.blueSides()[i])));
         }
     }
+
+    // la Sorgente e' completamente occupata: ognuno dei suoi 5 esagoni ha qualcosa sopra (carpa, obiettivo, percorso...)
+    // gli esagoni occupati da questa tessera, sopra l'acqua o come pezzo di laghetto; vuota se non e' nello stagno
+    public List<HexPosition> positionsOf(Tile tile) {
+        List<HexPosition> found = new ArrayList<>();
+        for (Map.Entry<HexPosition, Cell> entry : cells.entrySet()) {
+            Cell cell = entry.getValue();
+            if (cell.getTop() == tile || cell.getBase() == tile) {
+                found.add(entry.getKey());
+            }
+        }
+        return found;
+    }
+
+    public boolean waterSourceFilled() {
+        for (Cell cell : cells.values()) {
+            if (cell.getBase().getTileType() == TileType.WATERSOURCE && cell.getTop() == null) {
+                return false;   // basta un esagono libero
+            }
+        }
+        return true;
+    }
+
 
 }

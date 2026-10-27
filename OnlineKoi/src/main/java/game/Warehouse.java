@@ -45,6 +45,8 @@ public class Warehouse {
     private int countLuckyCards;
     private int countWarehouseExpansion;
 
+    
+
     public Warehouse(){
         this.countWater = maxWater;
         this.countLeaf = maxLeaf;
@@ -157,6 +159,23 @@ public class Warehouse {
                 return countLanterns > 0;
             default:
                 return false;   // sorgente e carpe non stanno in questa riserva
+        }
+    }
+
+    // tessera scartata dal magazzino a fine turno: torna nella riserva
+    public void giveBack(Tile tile) {
+        switch (tile.getTileType()) {
+            case WATER:
+                countWater++;
+                break;
+            case LEAF:
+                countLeaf++;
+                break;
+            case BORDER:
+                countBorder++;
+                break;
+            default:
+                break;   // nel magazzino ci stanno solo acqua, fogliame, sponde e carpe (che tornano al mercato)
         }
     }
 }

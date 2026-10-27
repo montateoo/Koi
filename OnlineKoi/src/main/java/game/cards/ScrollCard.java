@@ -12,7 +12,28 @@ public class ScrollCard extends Card {
 
     @Override
     public String describe() {
-        return "Scroll: " + pointsPerObject + " pts per " + objectiveObject;
+        return "Pergamena: " + pointsPerObject + " punti per ogni " + describe(objectiveObject);
+    }
+
+    private static String describe(ScrollObjective object) {
+        switch (object) {
+            case BIGKOI:    return "carpa grande";
+            case MEDIUMKOI: return "carpa media";
+            case SMALLKOI:  return "carpa piccola";
+            case LANTERN:   return "lanterna";
+            case LILY:      return "ninfea";
+            case WELL:      return "carta Pozzo";
+            case MARKET:    return "carta Mercato";
+            default:        return "carta Magazzino";
+        }
+    }
+
+    public ScrollObjective getScrollObjective(){
+        return objectiveObject;
+    }
+
+    public int getPointsPerObject(){
+        return pointsPerObject;
     }
     
 }

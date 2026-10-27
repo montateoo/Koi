@@ -9,9 +9,11 @@ public class ServerMain {
     public static final int PORT = 1099;   // la stessa che usano TextView e le Impostazioni del client
 
     public static void main(String[] args) throws IOException {
-        Lobby lobby = new Lobby();
+        HistoryStore store = new HistoryStore(HistoryStore.defaultLocation());
+        Lobby lobby = new Lobby(store);
+        System.out.println("Storico partite: " + store.file() + " (" + lobby.history().size() + (lobby.history().size() == 1 ? " partita)" : " partite)"));
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server ready on port " + PORT);
+            System.out.println("Server pronto sulla porta " + PORT);
             while (true) {
                 Socket socket = serverSocket.accept();   // aspetta il prossimo client
                 Thread.ofVirtual().start(() -> serve(socket, lobby));
@@ -28,7 +30,7 @@ public class ServerMain {
             try {
                 socket.close();
             } catch (IOException e1) {
-                e1.printStackTrace();
+                // il client non ha mai parlato: niente da fare
             }
         }
     }

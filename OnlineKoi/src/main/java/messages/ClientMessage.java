@@ -14,14 +14,17 @@ public sealed interface ClientMessage extends Serializable {
 
     // non serve piu' la callback: la connessione stessa e' il canale verso il client
     record JoinRoom(String roomId, String nickname) implements ClientMessage { }
-    
+
     record CreateAndJoinRoom(String name, String nickname) implements ClientMessage{}
+
+    // lo storico delle partite finite: la risposta e' ServerMessage.History
+    record ListHistory() implements ClientMessage { }
 
     // ---------------------------------------------------------------- stanza
 
     record StartGame() implements ClientMessage { }
 
-    // uscita volontaria; se invece la connessione cade il server se ne accorge da solo
+    // esce dalla stanza ma resta collegato (torna al menu); se la connessione cade il server se ne accorge da solo
     record Leave() implements ClientMessage { }
 
     record DrawCard(int position) implements ClientMessage { }
@@ -46,4 +49,6 @@ public sealed interface ClientMessage extends Serializable {
     record PlaceKoi(int type, int q, int r, int angle) implements ClientMessage { }
 
     record MoveKoi(int koiId, int q, int r, int angle) implements ClientMessage { }
+
+    record SpendLuckyCard() implements ClientMessage { }
 }

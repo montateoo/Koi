@@ -3,7 +3,9 @@ package client;
 import java.util.List;
 import java.util.Scanner;
 
+import game.scoring.ScoreSheet;
 import network.GameView;
+import network.MatchRecord;
 
 public class TextView implements View {
 
@@ -14,7 +16,7 @@ public class TextView implements View {
             return;
         }
 
-        System.out.println("Enter username");
+        System.out.println("Scrivi il tuo nome");
         String nickname = input.nextLine().trim();
         printHelp();
         controller.refreshRooms();
@@ -30,14 +32,14 @@ public class TextView implements View {
                     break;
                 case "create":
                     if (argument.isEmpty()) {
-                        showError("Usage: create <room name>");
+                        showError("Uso: create <nome stanza>");
                     } else {
                         controller.createRoom(argument);
                     }
                     break;
                 case "join":
                     if (argument.isEmpty()) {
-                        showError("Usage: join <room id>");
+                        showError("Uso: join <id stanza>");
                     } else {
                         controller.joinRoom(argument, nickname);
                     }
@@ -49,14 +51,14 @@ public class TextView implements View {
                     try {
                         controller.drawCard(Integer.parseInt(argument));
                     } catch (NumberFormatException e) {
-                        showError("Usage: draw <position>, for example: draw 2");
+                        showError("Uso: draw <posizione>, per esempio: draw 2");
                     }
                     break;
                 case "choose":
                     try {
                         controller.choose(Integer.parseInt(argument));
                     } catch (NumberFormatException e) {
-                        showError("Usage: choose <number>, for example: choose 0");
+                        showError("Uso: choose <numero>, per esempio: choose 0");
                     }
                     break;
                 case "water":
@@ -78,7 +80,7 @@ public class TextView implements View {
                     }
                     break;
                 case "border":
-                    int[] border = parseNumbers(argument, "border <q> <r> <angle>", 3);
+                    int[] border = parseNumbers(argument, "border <q> <r> <rotazione>", 3);
                     if (border != null) {
                         controller.placeBorder(border[0], border[1], border[2]);
                     }
@@ -90,19 +92,29 @@ public class TextView implements View {
                     }
                     break;
                 case "koi":
-                    int[] koi = parseNumbers(argument, "koi <type> <q> <r> <angle>", 4);
+                    int[] koi = parseNumbers(argument, "koi <tipo> <q> <r> <rotazione>", 4);
                     if (koi != null) {
                         controller.placeKoi(koi[0], koi[1], koi[2], koi[3]);
                     }
                     break;
                 case "move":
-                    int[] moveKoi = parseNumbers(argument, "move <koi id> <q> <r> <rotation>", 4);
+                    int[] moveKoi = parseNumbers(argument, "move <id carpa> <q> <r> <rotazione>", 4);
                     if (moveKoi != null) {
                         controller.moveKoi(moveKoi[0], moveKoi[1], moveKoi[2], moveKoi[3]);
                     }
                     break;                 
                 case "end":
                     controller.endTurn();
+                    break;
+                case "lucky":
+                    controller.spendLuckyCard();
+                    break;
+                case "leave":
+                    controller.leaveRoom();
+                    System.out.println("Sei uscito dalla stanza. Scrivi 'rooms' per vedere le stanze aperte.");
+                    break;
+                case "history":
+                    controller.requestHistory();
                     break;
                 case "quit":
                     controller.quit();
@@ -113,7 +125,7 @@ public class TextView implements View {
                 case "":
                     break;
                 default:
-                    showError("Unknown command '" + command + "', type 'help'");
+                    showError("Comando sconosciuto '" + command + "', scrivi 'help'");
             }
         }
     }
@@ -127,27 +139,27 @@ public class TextView implements View {
             }
             return numbers;
         } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-            showError("Usage: " + usage);
+            showError("Uso: " + usage);
             return null;
         }
     }
 
     private void printHelp() {
-        System.out.println("Commands: rooms | create <name> | join <room id> | start | draw <position> | choose <number> | water <q> <r> | leaf  <q> <r> | lily  <q> <r> | border <q> <r> <rotation> | lantern <q> <r> | koi <type> <q> <r> <rotation> | move <koi id> <q> <r> <rotation> | end | quit | help");
+        System.out.println("Comandi: rooms (stanze) | create <nome> | join <id stanza> | start | draw <posizione> (prendi una carta) | choose <numero> (rispondi) | water/leaf/lily/lantern <q> <r> (acqua, fogliame, ninfea, lanterna) | border <q> <r> <rotazione> (sponda) | koi <tipo 0-2> <q> <r> <rotazione> | move <id carpa> <q> <r> <rotazione> | lucky (segnalino Fortuna) | end (passa il turno) | leave (esci dalla stanza) | history (storico) | quit | help");
     }
 
     @Override
     public void showLobby(List<String> rooms) {
         if (rooms.isEmpty()) {
-            System.out.println("No rooms yet, create one with: create <name>");
+            System.out.println("Nessuna stanza: creane una con create <nome>");
         } else {
-            System.out.println("Rooms: " + rooms);
+            System.out.println("Stanze: " + rooms);
         }
     }
 
     @Override
     public void showRoom(String roomId) {
-        System.out.println("Joined room " + roomId + ". Type 'start' when everyone is in.");
+        System.out.println("Sei nella stanza " + roomId + ". Scrivi 'start' quando ci sono tutti.");
     }
 
     @Override
@@ -157,12 +169,22 @@ public class TextView implements View {
 
     @Override
     public void showError(String text) {
-        System.out.println("[error] " + text);
+        System.out.println("[errore] " + text);
     }
 
     @Override
     public void showGame(GameView view) {
         System.out.println(GameViewPrinter.render(view));
+    }
+
+    @Override
+    public void showGameOver(List<ScoreSheet> ranking) {
+        System.out.println(GameViewPrinter.renderScores(ranking));
+    }
+
+    @Override
+    public void showHistory(List<MatchRecord> matches) {
+        System.out.println(GameViewPrinter.renderHistory(matches));
     }
 
 }

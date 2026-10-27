@@ -284,8 +284,8 @@ public class PondPane extends StackPane {
                 hex.setFill(KoiArt.waterFill(cx, cy, size, false));
                 waterCentres.add(new double[] {cx, cy});
         }
-        Tooltip.install(hex, new Tooltip("(" + cell.q() + "," + cell.r() + ")  " + cell.base().toLowerCase()
-                + (cell.top() == null ? "" : " + " + cell.top().toLowerCase())));
+        Tooltip.install(hex, new Tooltip("(" + cell.q() + "," + cell.r() + ")  " + PlayerPanel.readable(cell.base()).toLowerCase()
+                + (cell.top() == null ? "" : " + " + PlayerPanel.readable(cell.top()).toLowerCase())));
         group.getChildren().add(hex);
 
         switch (look) {

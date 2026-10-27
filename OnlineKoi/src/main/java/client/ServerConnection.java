@@ -7,9 +7,12 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
 
+import game.scoring.ScoreSheet;
 import messages.ClientMessage;
+import messages.SerialFilters;
 import messages.ServerMessage;
 import network.GameView;
+import network.MatchRecord;
 
 public class ServerConnection {
     private final Socket socket;
@@ -25,6 +28,7 @@ public class ServerConnection {
         out = new ObjectOutputStream(socket.getOutputStream());   // PRIMA l'output...
         out.flush();                                              // ...e flush
         in = new ObjectInputStream(socket.getInputStream());      // POI l'input
+        in.setObjectInputFilter(SerialFilters.FROM_SERVER);       // solo le classi del protocollo
         
         Thread.ofVirtual().start(this::listen);
     }
@@ -45,11 +49,13 @@ public class ServerConnection {
                     case ServerMessage.ErrorMessage(String text) -> view.showError(text);
                     case ServerMessage.RoomList(List<String> rooms) -> view.showLobby(rooms);
                     case ServerMessage.Joined(String roomId) -> view.showRoom(roomId);
+                    case ServerMessage.GameOver(List<ScoreSheet> ranking) -> view.showGameOver(ranking);
+                    case ServerMessage.History(List<MatchRecord> matches) -> view.showHistory(matches);
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
             if (!closing) {
-                view.showError("Connection to the server lost");
+                view.showError("Connessione al server persa");
             }
         }
     }

@@ -1,5 +1,7 @@
 package server;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -7,8 +9,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import network.CellView;
+import network.MatchRecord;
 import network.GameView;
 import network.HexCoord;
 import network.ObjectiveView;
@@ -26,6 +30,7 @@ import game.TileType;
 import game.cards.Actions;
 import game.objectives.Objective;
 import game.objectives.ObjectiveType;
+import game.scoring.ScoreSheet;
 import messages.ServerMessage;
 import game.cards.Card;
 
@@ -39,40 +44,57 @@ public class RoomController {
     private LinkedHashMap<Player, ClientHandler> joinedPlayers;
     private final Set<Player> readyPlayers = new HashSet<>();
     private Player endingTurn;   // giocatore che ha premuto End ma deve ancora rispondere sugli obiettivi
+    private final Consumer<MatchRecord> onFinished;   // a fine partita: la lobby toglie la stanza e la mette nello storico
 
 
-    public RoomController(String id, String roomName){
+    public RoomController(String id, String roomName, Consumer<MatchRecord> onFinished){
         this.gameId = id;
         this.roomName = roomName;
         this.gameState = GameState.WAITING;
         this.game = new GameRoom();
         this.joinedPlayers = new LinkedHashMap<>();
+        this.onFinished = onFinished;
+    }
+
+    // il giocatore esce dalla stanza: si puo' in attesa (libera il posto) e a partita finita (torna al menu);
+    // durante la partita no, finche' non decidiamo come continuare senza di lui. false se l'uscita e' rifiutata
+    public synchronized boolean removePlayer(Player player) {
+        if (gameState == GameState.PLAYING) {
+            return false;
+        }
+        joinedPlayers.remove(player);
+        if (gameState == GameState.WAITING) {
+            game.removePlayer(player);
+            readyPlayers.remove(player);
+            sendMessageToAll(player.getName() + " ha lasciato la stanza");
+        }
+        return true;
     }
 
     // true se il giocatore e' entrato; e' la stanza a dire Joined, cosi' arriva prima del benvenuto
     public synchronized boolean addPlayer(Player newPlayer, ClientHandler client) {
         if (gameState != GameState.WAITING) {
-            client.send(new ServerMessage.ErrorMessage("The game has already started"));
+            client.send(new ServerMessage.ErrorMessage("La partita è già iniziata"));
             return false;
         }
         if (game.isFull()) {
-            client.send(new ServerMessage.ErrorMessage("The room is full"));
+            client.send(new ServerMessage.ErrorMessage("La stanza è piena"));
             return false;
         }
         joinedPlayers.put(newPlayer, client);
         game.addPlayer(newPlayer);
         client.send(new ServerMessage.Joined(gameId));
-        client.send(new ServerMessage.Info("Welcome to the game " + newPlayer.getName()));
+        client.send(new ServerMessage.Info("Benvenuto nella partita, " + newPlayer.getName()));
         return true;
     }
 
     public synchronized void startGame(Player player) {
         if (gameState != GameState.WAITING) {
-            tell(player, "The game has already started");
+            tell(player, "La partita è già iniziata");
             return;
         }
         readyPlayers.add(player);
-        sendMessageToAll(player.getName() + " is ready (" + readyPlayers.size() + "/" + joinedPlayers.size() + ")");
+        sendMessageToAll(player.getName() + " è pronto (" + readyPlayers.size() + "/" + joinedPlayers.size() + ")");
 
         if (readyPlayers.size() == joinedPlayers.size()) {
             gameState = GameState.PLAYING;
@@ -88,7 +110,11 @@ public class RoomController {
 
         int boardSize = game.getBoard().getDrawableCards().size();
         if (position < 0 || position >= boardSize) {
-            tell(player, "Choose a position between 0 and " + (boardSize - 1));
+            tell(player, "Scegli una posizione tra 0 e " + (boardSize - 1));
+            return;
+        }
+        if (game.getBoard().getDrawableCards().get(position) == null) {
+            tell(player, "Quello spazio è vuoto: il mazzo è finito");
             return;
         }
         
@@ -110,7 +136,7 @@ public class RoomController {
     private GameView buildView(Player viewer) {
         List<String> board = new ArrayList<>();
         for (Card card : game.getBoard().getDrawableCards()) {
-            board.add(card.describe());
+            board.add(card == null ? "" : card.describe());   // "" = spazio vuoto (mazzo finito)
         }
 
         List<PlayerView> players = new ArrayList<>();
@@ -129,7 +155,7 @@ public class RoomController {
                 question = pending.question();
                 options = pending.options();
             } else {
-                question = "Waiting for " + pending.player().getName() + " to choose";
+                question = "In attesa della scelta di " + pending.player().getName();
             }
         }
 
@@ -184,7 +210,8 @@ public class RoomController {
             }
         }
 
-        boolean canDraw = viewer == active && pending == null && viewer.getState() == PlayerState.IDLE;
+        boolean canDraw = viewer == active && pending == null && viewer.getState() == PlayerState.IDLE
+                && gameState == GameState.PLAYING && game.getBoard().hasCards();
 
         // i tre obiettivi sul tavolo; "claimable" solo per quelli che si reclamano a fine turno (non il Percorso)
         List<ObjectiveView> objectives = new ArrayList<>();
@@ -276,15 +303,15 @@ public class RoomController {
                     }
                     sendToAllPlayer();
                 } else {
-                    tell(player, "Choice is out of the range");
+                    tell(player, "Scelta non valida");
                     return;                  
                 }
             } else {
-                tell(player, "It's " + choice.player().getName()+ "'s choice");
+                tell(player, "Tocca a " + choice.player().getName() + " scegliere");
                 return;
             }
         } else {
-            tell(player, "There is nothing to choose right now");
+            tell(player, "Non c'è niente da scegliere adesso");
             return;  
         }
     }
@@ -292,7 +319,7 @@ public class RoomController {
     // il giocatore vuole lavorare: va bene se e' IDLE o sta gia' lavorando
     private boolean startWorking(Player player) {
         if (player.getState() == PlayerState.MEDITATING) {
-            tell(player, "You drew a card this turn, you can't work");
+            tell(player, "Hai preso una carta in questo turno: non puoi lavorare");
             return false;
         }
         player.working();
@@ -301,11 +328,11 @@ public class RoomController {
 
     private boolean startMeditating(Player player) {
         if (player.getState() == PlayerState.WORKING) {
-            tell(player, "You are working this turn, you can't draw");
+            tell(player, "Stai lavorando in questo turno: non puoi prendere carte");
             return false;
         }
         if (player.getState() == PlayerState.MEDITATING) {
-            tell(player, "You already took a card this turn");
+            tell(player, "Hai già preso una carta in questo turno");
             return false;
         }
         player.meditating();
@@ -319,15 +346,15 @@ public class RoomController {
 
         HexPosition position = new HexPosition(q, r);
         if (!player.getInventory().hasTile(tileType)) {
-            tell(player, "You have no " + tileType.displayName() + " in your storage");
+            tell(player, "Nel magazzino non hai: " + tileType.displayName());
             return;
         }
         if (!player.getPlayablePositions(tileType).contains(position)) {
-            tell(player, "You can't place the " + tileType.displayName() + " there");
+            tell(player, "Qui non si può piazzare: " + tileType.displayName());
             return;
         }
         if (!player.hasWorkerFor(action)) {
-            tell(player, "Nobody is free to place the " + tileType.displayName());
+            tell(player, "Nessun lavoratore libero per piazzare: " + tileType.displayName());
             return;
         }
         if (!startWorking(player)) {   // ultimo controllo: da qui lo stato cambia
@@ -344,15 +371,15 @@ public class RoomController {
 
         HexPosition position = new HexPosition(q, r);
         if (!player.getInventory().hasTile(tileType)) {
-            tell(player, "You have no " + tileType.displayName() + " in your storage");
+            tell(player, "Nel magazzino non hai: " + tileType.displayName());
             return;
         }
         if (!player.canPlace(tileType, position, angle)) {
-            tell(player, "You can't place the " + tileType.displayName() + " there with that rotation");
+            tell(player, "Qui non si può piazzare con quella rotazione: " + tileType.displayName());
             return;
         }
         if (!player.hasWorkerFor(action)) {
-            tell(player, "Nobody is free to place the " + tileType.displayName());
+            tell(player, "Nessun lavoratore libero per piazzare: " + tileType.displayName());
             return;
         }
         if (!startWorking(player)) {   // ultimo controllo: da qui lo stato cambia
@@ -378,15 +405,15 @@ public class RoomController {
         
         HexPosition position = new HexPosition(q, r);
         if (!game.reserveHas(tileType)) {
-            tell(player, "There is no " + tileType.displayName() + " left in the reserve");
+            tell(player, "Nella riserva non c'è più: " + tileType.displayName());
             return;
         }
         if (!player.getPlayablePositions(tileType).contains(position)) {
-            tell(player, "You can't place the " + tileType.displayName() + " there");
+            tell(player, "Qui non si può piazzare: " + tileType.displayName());
             return;
         }
         if (!player.hasWorkerFor(action)) {
-            tell(player, "Nobody is free to place the " + tileType.displayName());
+            tell(player, "Nessun lavoratore libero per piazzare: " + tileType.displayName());
             return;
         }
         if (!startWorking(player)) {
@@ -405,19 +432,19 @@ public class RoomController {
         }
         HexPosition position = new HexPosition(q, r);
         if (!player.hasKoi(koiId)) {
-            tell(player, "There is no koi with id " + koiId + " in your pond");
+            tell(player, "Nel tuo stagno non c'è la carpa " + koiId);
             return;
         }
         if (player.isKoiAt(koiId, position, angle)) {
-            tell(player, "The koi is already there: choose a different place");
+            tell(player, "La carpa è già lì: scegli un altro posto");
             return;
         }
         if (!player.canMoveKoi(koiId, position, angle)) {
-            tell(player, "The koi doesn't fit there with that rotation");
+            tell(player, "La carpa non entra lì con quella rotazione");
             return;
         }
         if (!player.hasWorkerFor(action)) {
-            tell(player, "Nobody is free to move the koi");
+            tell(player, "Nessun lavoratore libero per spostare la carpa");
             return;
         }
         if (!startWorking(player)) {   // ultimo controllo: da qui lo stato cambia
@@ -455,7 +482,7 @@ public class RoomController {
         } else if (type==2) {
             placeTile(player, TileType.BIGKOI, Actions.PLACEKOI, q, r, angle);
         } else {
-            tell(player, "Koi type must be 0 (small), 1 (medium) or 2 (big)");
+            tell(player, "Il tipo di carpa deve essere 0 (piccola), 1 (media) o 2 (grande)");
         } 
     }
 
@@ -464,19 +491,23 @@ public class RoomController {
     }
 
     private boolean canAct(Player player){
+        if (gameState == GameState.FINISHED) {
+            tell(player, "La partita è finita");
+            return false;
+        }
         if (gameState != GameState.PLAYING) {
-            tell(player, "The game has not started yet");
+            tell(player, "La partita non è ancora iniziata");
             return false;
         }
         if (player != game.getActivePlayer()) {
-            tell(player, "It's not your turn, wait for " + game.getActivePlayer().getName());
+            tell(player, "Non è il tuo turno: tocca a " + game.getActivePlayer().getName());
             return false ;
         }
         if (game.getPendingChoice() != null) {
             if(game.getPendingChoice().player() == player){
-                tell(player, "Answer the question first (choose <number>)");    
+                tell(player, "Rispondi prima alla domanda");    
             } else {
-                tell(player, "Waiting for " + game.getPendingChoice().player().getName() + " to choose");
+                tell(player, "In attesa della scelta di " + game.getPendingChoice().player().getName());
                 
             }
             return false; 
@@ -488,11 +519,17 @@ public class RoomController {
         if (!canAct(player)) {
             return;
         }
-        if (player.getState() == PlayerState.IDLE) {
-            tell(player, "You must meditate (draw a card) or work before ending your turn");
+        // tabellone vuoto (mazzo finito e carte esaurite): chi non ha niente da piazzare deve poter passare,
+        // altrimenti la partita si blocca
+        if (player.getState() == PlayerState.IDLE && game.getBoard().hasCards()) {
+            tell(player, "Prima di passare il turno devi meditare (prendere una carta) o lavorare");
             return;
         }
-        if (game.checkObjectivesforPlayer(player)) {
+        // fine turno: prima gli scarti se il magazzino e' troppo pieno, poi gli obiettivi;
+        // il turno passa quando sono finite le risposte (vedi choose)
+        boolean questions = game.askStorageDiscard(player);
+        questions |= game.checkObjectivesforPlayer(player);
+        if (questions) {
             endingTurn = player;
             sendToAllPlayer();       // mostra la domanda
             return;
@@ -503,7 +540,38 @@ public class RoomController {
     private void finishTurn(Player player) {
         player.turnEnded();          // stato IDLE, giocatore e aiutanti si riposano
         game.goToNextPlayer();
-        sendMessageToAll("It's " + game.getActivePlayer().getName() + "'s turn");
+        if (game.isOver()) {         // era l'ultimo turno del giro finale
+            changeState();           // PLAYING -> FINISHED: da qui canAct rifiuta ogni azione
+            sendToAllPlayer();       // l'ultimo stato dello stagno, poi la classifica sopra
+            List<ScoreSheet> ranking = game.getFinalScores();
+            sendMessageToAll("Partita finita! Vince " + ranking.get(0).name() + " con " + ranking.get(0).total() + " punti");
+            for (ClientHandler client : joinedPlayers.values()) {
+                client.send(new ServerMessage.GameOver(ranking));
+            }
+            // nello storico: classifica e fotografia finale di ogni stagno
+            List<PlayerView> finalPonds = new ArrayList<>();
+            for (Player p : game.getPlayers()) {
+                finalPonds.add(buildPlayerView(p));
+            }
+            String endedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+            onFinished.accept(new MatchRecord(roomName, endedAt, ranking, finalPonds));
+            return;
+        }
+        sendMessageToAll("Tocca a " + game.getActivePlayer().getName());
+        sendToAllPlayer();
+    }
+
+	public synchronized void spendLuckyCard(Player player) {
+        if(!canAct(player)){
+            return;
+        }
+
+        if (!player.getInventory().hasLuckyCard()) {
+            tell(player, "Non hai segnalini Fortuna");
+            return;
+        }
+
+        game.playerAskLuckyCardBonus();
         sendToAllPlayer();
     }
 

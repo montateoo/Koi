@@ -16,13 +16,13 @@ public class ClientController {
     // unico punto da cui partono i messaggi: controlla la connessione e gestisce l'errore di scrittura
     private void send(ClientMessage message) {
         if (server == null) {
-            view.showError("Not connected to the server: check the address in the settings");
+            view.showError("Non sei collegato al server: controlla l'indirizzo nelle impostazioni");
             return;
         }
         try {
             server.send(message);
         } catch (IOException e) {
-            view.showError("Could not reach the server: " + e.getMessage());
+            view.showError("Il server non risponde: " + e.getMessage());
         }
     }
 
@@ -36,7 +36,7 @@ public class ClientController {
             server = new ServerConnection(host, port, view);
             return true;
         } catch (IOException e) {
-            view.showError("Cannot reach the server " + host + ":" + port + " (" + e.getMessage() + ")");
+            view.showError("Non riesco a raggiungere il server " + host + ":" + port + " (" + e.getMessage() + ")");
             return false;
         }
     }
@@ -92,6 +92,20 @@ public class ClientController {
 
     public void moveKoi(int koiId, int q, int r, int angle) {
         send(new ClientMessage.MoveKoi(koiId,q,r,angle));
+    }
+
+    public void spendLuckyCard(){
+        send(new ClientMessage.SpendLuckyCard());
+    }
+
+    // esce dalla stanza restando collegato (a fine partita: torna al menu)
+    public void leaveRoom() {
+        send(new ClientMessage.Leave());
+    }
+
+    // lo storico arriva a parte, come ServerMessage.History -> view.showHistory
+    public void requestHistory() {
+        send(new ClientMessage.ListHistory());
     }
 
     public void endTurn() {

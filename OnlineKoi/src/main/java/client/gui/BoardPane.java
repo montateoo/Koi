@@ -27,11 +27,11 @@ public class BoardPane extends HBox {
 
     // stessi effetti di Board.drawEffect (posizioni 0-4)
     private static final String[] SLOT_EFFECT = {
-        "pay 1 coin",
-        "free",
-        "+2 coins  +1 water",
-        "1 coin + 2 water\nor koi market",
-        "2 borders\nor 2 leaves"
+        "paga 1 moneta",
+        "gratis",
+        "+2 monete  +1 acqua",
+        "1 moneta + 2 acqua\no mercato carpe",
+        "2 sponde\no 2 fogliami"
     };
 
     private static final double CARD_W = 128;
@@ -65,6 +65,9 @@ public class BoardPane extends HBox {
     }
 
     private Node card(String description, int position, boolean canDraw) {
+        if (description.isEmpty()) {
+            return emptySlot();   // mazzo finito: lo spazio resta vuoto
+        }
         String type = description.contains(":") ? description.substring(0, description.indexOf(':')).trim() : description;
         String body = description.contains(":") ? description.substring(description.indexOf(':') + 1).trim() : "";
 
@@ -80,7 +83,7 @@ public class BoardPane extends HBox {
         band.setArcHeight(10);
 
         Text name = new Text(type.toUpperCase());
-        name.setFont(Theme.title(type.length() > 7 ? 10.5 : 13));   // "WAREHOUSE" altrimenti esce dalla carta
+        name.setFont(Theme.title(type.length() > 7 ? 10.5 : 13));   // "PERGAMENA" e "MAGAZZINO" altrimenti escono dalla carta
         name.setFill(Theme.INK);
 
         HBox header = new HBox(8, KoiArt.seal(kanjiOf(type), type.substring(0, 1), 30, colorOf(type)), name);
@@ -88,7 +91,7 @@ public class BoardPane extends HBox {
         StackPane headerBox = new StackPane(band, header);
         StackPane.setMargin(header, new Insets(0, 0, 0, 8));
 
-        Text text = new Text(type.equals("Rain") ? rainTiles(body) : prettify(body));
+        Text text = new Text(type.equals("Pioggia") ? rainTiles(body) : prettify(body));
         text.setFont(Theme.serif(13));
         text.setFill(Theme.INK);
         text.setWrappingWidth(CARD_W - 20);
@@ -121,6 +124,23 @@ public class BoardPane extends HBox {
         return card;
     }
 
+    // spazio del tabellone senza carta (mazzo finito): contorno tratteggiato, non cliccabile
+    private static Node emptySlot() {
+        Rectangle outline = new Rectangle(CARD_W, CARD_H);
+        outline.setArcWidth(14);
+        outline.setArcHeight(14);
+        outline.setFill(Color.color(1, 1, 1, 0.18));
+        outline.setStroke(Theme.INK_SOFT);
+        outline.setStrokeWidth(1.5);
+        outline.getStrokeDashArray().addAll(8.0, 6.0);
+        Text empty = new Text("vuoto");
+        empty.setFont(Theme.serif(12));
+        empty.setFill(Theme.INK_SOFT);
+        StackPane slot = new StackPane(outline, empty);
+        slot.setMaxSize(CARD_W, CARD_H);
+        return slot;
+    }
+
     private Node slotLabel(int position) {
         Text effect = new Text(position < SLOT_EFFECT.length ? SLOT_EFFECT[position] : "");
         effect.setFont(Theme.serif(11.5));
@@ -150,26 +170,13 @@ public class BoardPane extends HBox {
         both.play();
     }
 
-    // "[PLACEWATER] usesLeft: 2/2" -> "place up to 2 water"
+    // le descrizioni arrivano gia' in italiano dal server: qui si toglie solo la parte degli usi
+    // ("piazza una carpa o sposta una carpa | usi: 1/1") e si va a capo prima di ogni alternativa
     static String prettify(String body) {
-        return body.replaceAll("\\s*usesLeft:.*", "")
-                .replace("[", "").replace("]", "")
-                .replace("PLACEWATER", "place up to 2 water")
-                .replace("PLACELEAFS", "place a leaf")
-                .replace("PLACELILY", "add a lily")
-                .replace("PLACEBORDER", "place a border")
-                .replace("PLACELANTERN", "add a lantern")
-                .replace("PLACEKOI", "place a koi")
-                .replace("MOVEKOI", "move a koi")
-                .replace(", ", "\nor ")
-                .replace("BIGKOI", "big koi")
-                .replace("MEDIUMKOI", "medium koi")
-                .replace("SMALLKOI", "small koi")
-                .replace("WATER", "water")
-                .replace("LEAF", "leaf");
+        return body.replaceAll("\\s*\\|\\s*usi:.*", "").replace(" o ", "\no ");
     }
 
-    // "[WATER, WATER, LEAF]" -> "2 water + 1 leaf, placed at once"
+    // "[acqua, acqua, fogliame]" -> "2 acqua + 1 fogliame, piazzate subito"
     private static String rainTiles(String body) {
         java.util.Map<String, Integer> counts = new java.util.LinkedHashMap<>();
         for (String tile : body.replace("[", "").replace("]", "").split(",")) {
@@ -184,29 +191,29 @@ public class BoardPane extends HBox {
             }
             text.append(entry.getValue()).append(' ').append(entry.getKey());
         }
-        return text + "\nplaced at once";
+        return text + "\npiazzate subito";
     }
 
     static String kanjiOf(String type) {
         switch (type) {
-            case "Helper":    return "助";
-            case "Warehouse": return "蔵";
-            case "Market":    return "市";
-            case "Rain":      return "雨";
-            case "Well":      return "井";
-            case "Scroll":    return "巻";
+            case "Aiutante":  return "助";
+            case "Magazzino": return "蔵";
+            case "Mercato":   return "市";
+            case "Pioggia":   return "雨";
+            case "Pozzo":     return "井";
+            case "Pergamena": return "巻";
             default:          return "札";
         }
     }
 
     static Color colorOf(String type) {
         switch (type) {
-            case "Helper":    return Theme.TEAL_DEEP;
-            case "Warehouse": return Theme.WOOD;
-            case "Market":    return Theme.GOLD;
-            case "Rain":      return Color.web("#4a78b5");
-            case "Well":      return Theme.STONE_DARK;
-            case "Scroll":    return Theme.VERMILION;
+            case "Aiutante":  return Theme.TEAL_DEEP;
+            case "Magazzino": return Theme.WOOD;
+            case "Mercato":   return Theme.GOLD;
+            case "Pioggia":   return Color.web("#4a78b5");
+            case "Pozzo":     return Theme.STONE_DARK;
+            case "Pergamena": return Theme.VERMILION;
             default:          return Theme.INK;
         }
     }
