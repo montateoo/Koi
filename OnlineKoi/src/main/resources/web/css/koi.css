@@ -1,0 +1,537 @@
+/* stile del gioco: carta color crema, inchiostro scuro, accenti vermiglio e oro, legno per pulsanti e pannelli */
+
+:root {
+  --paper: #f6efdc;
+  --paper-light: #fbf7ec;
+  --paper-dark: #e4d6b4;
+  --ink: #2b2622;
+  --ink-soft: #7a6c5a;
+  --vermilion: #c8341f;
+  --vermilion-dark: #8e1f10;
+  --gold: #d4a13a;
+  --teal-light: #c3ecf1;
+  --teal: #6cc3cf;
+  --teal-deep: #2e7f8f;
+  --wood: #9a7048;
+  --wood-dark: #6b4a2e;
+  --line: #c9b99a;
+  --serif: "Shippori Mincho", "Yu Mincho", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0d2424;
+  color: var(--ink);
+  font: 15px/1.4 var(--serif);
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, p { margin: 0; }
+h2 { font-size: 28px; font-weight: 800; }
+[hidden] { display: none !important; }
+
+.kanji { font-family: var(--serif); font-weight: 800; color: var(--vermilion); line-height: 1; }
+.muted { color: var(--ink-soft); }
+.spacer { flex: 1; }
+.row { display: flex; align-items: center; gap: 8px; }
+
+/* ---------------------------------------------------------------- pulsanti */
+
+button {
+  font: inherit;
+  font-size: 14px;
+  color: var(--paper);
+  background: var(--ink);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 7px 18px;
+  cursor: pointer;
+  transition: background-color .15s;
+}
+button:hover { background: var(--vermilion); }
+button:active { background: var(--vermilion-dark); }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button.ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
+button.ghost:hover:not(:disabled) { background: rgba(200, 52, 31, .12); }
+button.small { padding: 4px 10px; font-size: 13px; }
+
+/* targa di legno con cornice rossa (assets/ui/button*.png): l'immagine si allarga alla misura del pulsante */
+.menu-button, .wood-button {
+  background: transparent url(../assets/ui/button.png) center / 100% 100% no-repeat;
+  color: #3b2414;
+  font-weight: 700;
+  border: none;
+  filter: drop-shadow(0 3px 5px rgba(10, 30, 30, .45));
+}
+.menu-button:hover, .wood-button:hover {
+  background: transparent url(../assets/ui/button_hover.png) center / 100% 100% no-repeat;
+  color: var(--vermilion-dark);
+}
+.menu-button:active, .wood-button:active {
+  background: transparent url(../assets/ui/button_pressed.png) center / 100% 100% no-repeat;
+}
+.menu-button { width: 300px; height: 100px; font-size: 22px; padding: 18px 30px 8px; }
+.wood-button { min-height: 46px; min-width: 110px; padding: 12px 24px 8px; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- pannelli */
+
+/* pannello di legno con cornice dorata, a 9 fette: gli angoli restano fissi, il centro si allarga */
+.koi-panel {
+  border: 30px solid transparent;
+  border-image: url(../assets/ui/panel.png) 56 fill / 30px stretch;
+  padding: 4px 8px 0;
+  filter: drop-shadow(0 5px 12px rgba(10, 30, 30, .5));
+}
+.koi-panel .muted { color: #5b4027; }
+
+.panel {
+  background: rgba(251, 247, 236, .93);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(60, 40, 20, .22);
+}
+.panel-title { font-size: 14px; font-weight: 700; color: var(--wood-dark); margin-bottom: 8px; }
+.panel-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.heading-kanji { font-size: 48px; text-shadow: 0 0 10px rgba(128, 25, 13, .3); }
+
+input[type=text] {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--paper-light);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+}
+input[type=text]:focus { outline: 2px solid var(--gold); }
+
+.layer {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 20;
+  background: rgba(30, 20, 10, .45);
+  animation: fade-in .2s ease-out;
+}
+
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes grow-in { 0% { transform: scale(.85); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+
+/* ---------------------------------------------------------------- schermate */
+
+.screen { display: none; position: fixed; inset: 0; overflow: hidden; }
+.screen.active { display: block; }
+
+.pond-backdrop {
+  background: #0d2424 url(../assets/images/title.jpg) center / cover;
+}
+.pond-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 24, 24, .45);
+}
+.pond-backdrop.active { display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 16px; overflow: auto; }
+.pond-backdrop > .koi-panel { position: relative; }
+
+/* ---------------------------------------------------------------- schermata iniziale */
+
+#title { background: black; }
+.title-bg {
+  position: absolute;
+  inset: 0;
+  background: url(../assets/images/title.jpg) center / cover;
+  transform: scale(1.12);
+}
+.title-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(10, 30, 30, .05), rgba(10, 30, 30, .45));
+}
+.title-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+}
+.title-kanji { font-size: 76px; text-shadow: 0 0 18px rgba(255, 255, 255, .75); }
+.title-name {
+  font-size: 46px;
+  font-weight: 800;
+  color: var(--paper-light);
+  text-shadow: 0 0 14px rgba(13, 38, 38, .85);
+  margin-bottom: 18px;
+}
+.menu-buttons { display: flex; flex-direction: column; gap: 12px; }
+.player-corner {
+  position: absolute;
+  right: 28px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.player-name {
+  color: var(--paper-light);
+  font-size: 16px;
+  cursor: pointer;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .8);
+}
+.player-button {
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: none;
+  background: transparent url(../assets/ui/player.png) center / 100% 100% no-repeat;
+  filter: drop-shadow(0 3px 6px rgba(10, 30, 30, .5));
+  display: grid;
+  place-items: center;
+}
+.player-button:hover, .player-button:active {
+  background: transparent url(../assets/ui/player_hover.png) center / 100% 100% no-repeat;
+}
+.player-button svg { width: 30px; height: 30px; fill: var(--paper-light); filter: drop-shadow(0 1px 2px rgba(51, 25, 13, .8)); }
+.curtain { position: absolute; inset: 0; background: black; pointer-events: none; opacity: 0; }
+
+/* introduzione: nero -> laghetto (2,5 s), poi lo zoom lento durante il quale salgono menu e pulsante del giocatore */
+#title.intro .curtain { opacity: 1; animation: curtain-out 2.5s ease-in .4s forwards; }
+#title.intro .title-bg { transform: scale(1); animation: zoom-in 6s cubic-bezier(.25, .1, .25, 1) 2.9s forwards; }
+#title.intro .title-menu { opacity: 0; animation: rise 1.4s ease-out 4.7s forwards; }
+#title.intro .player-corner { opacity: 0; animation: rise 1s ease-out 5.9s forwards; }
+@keyframes curtain-out { to { opacity: 0; } }
+@keyframes zoom-in { to { transform: scale(1.12); } }
+@keyframes rise { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+
+/* messaggi ed errori fuori dalla stanza: targa scura con la cornice verde acqua, svanisce da sola */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  max-width: min(640px, calc(100vw - 32px));
+  border: 20px solid transparent;
+  border-width: 20px 24px;
+  border-image: url(../assets/ui/toast.png) 60 70 fill / 20px 24px stretch;
+  color: var(--paper-light);
+  padding: 0 10px;
+  text-align: center;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s;
+}
+.toast.show { opacity: 1; transition: none; }
+
+/* finestre di dialogo della schermata iniziale, con il loto appoggiato sull'angolo */
+.dialog { position: relative; width: min(440px, 100%); animation: grow-in .25s ease-out; }
+.dialog .koi-panel { display: flex; flex-direction: column; gap: 10px; }
+.dialog h2 { font-size: 22px; }
+.dialog .error { color: var(--vermilion); min-height: 1.2em; }
+.dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog .lilypad { position: absolute; left: -26px; top: -14px; width: 64px; pointer-events: none; }
+.dialog .lotus { position: absolute; left: -18px; top: -30px; width: 52px; pointer-events: none; }
+.dialog label.check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+
+/* petali di ciliegio sopra tutto, ma sotto le finestre */
+.sakura { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+
+/* ---------------------------------------------------------------- lobby */
+
+.lobby-card { min-width: 0; width: min(520px, 100%); }
+.lobby-player { margin-bottom: 8px; }
+.room-list, .match-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  background: var(--paper-light);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow-y: auto;
+}
+.room-list { min-height: 200px; max-height: 40vh; }
+.room-list li, .match-list li {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(201, 185, 154, .5);
+  cursor: pointer;
+}
+.room-list li:hover, .match-list li:hover { background: #efe4c8; }
+.room-list li.selected, .match-list li.selected { background: var(--vermilion); color: var(--paper-light); }
+.room-list li.selected .muted, .match-list li.selected .muted { color: #f5d9d2; }
+.room-list li.closed { opacity: .6; }
+.room-list li.empty, .match-list li.empty { cursor: default; color: var(--ink-soft); background: none; }
+.room-list .room-name, .match-list .match-name { font-weight: 700; }
+.lobby-status, .history-status { min-height: 1.3em; margin-top: 8px; }
+.lobby-card .row { flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- storico */
+
+.history-card { min-width: 0; width: min(1100px, 100%); height: min(680px, calc(100vh - 32px)); display: flex; flex-direction: column; }
+.history-body { flex: 1; display: flex; gap: 18px; min-height: 0; }
+.match-list { width: 300px; flex-shrink: 0; margin: 0; }
+.match-details { flex: 1; min-width: 0; overflow-y: auto; padding: 0 8px 0 4px; display: flex; flex-direction: column; gap: 14px; }
+.match-details h3 { font-size: 22px; }
+.match-details > * { min-width: 0; }
+.pond-cards { display: flex; flex-wrap: wrap; gap: 14px; }
+.pond-card { background: rgba(195, 236, 241, .35); border-radius: 6px; padding: 8px; flex: 0 1 286px; min-width: 0; }
+.pond-card .pond { width: 100%; height: 200px; }
+
+@media (max-width: 760px) {
+  .history-card { height: auto; min-height: calc(100vh - 32px); }
+  .history-body { flex-direction: column; }
+  .match-list { width: auto; max-height: 30vh; }
+}
+
+.score-table { border-collapse: collapse; }
+.score-table th { font-size: 14px; color: var(--wood-dark); text-align: right; padding: 0 0 6px 14px; }
+.score-table td { text-align: right; padding: 3px 0 3px 14px; }
+.score-table th:nth-child(-n+2), .score-table td:nth-child(-n+2) { text-align: left; }
+.score-table td:nth-child(2) { padding-right: 10px; }
+.score-table .total { font-size: 17px; font-weight: 700; }
+.score-table tr.winner td { color: #7a4f08; }
+.score-table tr.me td { font-weight: 700; }
+.table-scroll { overflow-x: auto; }
+
+/* ---------------------------------------------------------------- stanza */
+
+#room {
+  background-color: var(--paper);
+  background-image: var(--seigaiha);
+}
+#room.active {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "header header header" "left centre right";
+  gap: 12px;
+  padding: 14px;
+}
+.room-header { grid-area: header; display: flex; align-items: center; gap: 14px; padding: 8px 16px; flex-wrap: wrap; }
+.room-logo { font-size: 32px; }
+.room-title { font-size: 18px; font-weight: 700; }
+.turn-status { font-size: 15px; }
+.room-left { grid-area: left; overflow-y: auto; }
+.room-centre { grid-area: centre; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.room-right { grid-area: right; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.room-right .others { flex: 1; min-height: 120px; display: flex; flex-direction: column; }
+.opponents { overflow-y: auto; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.room-log { height: 150px; overflow-y: auto; font-size: 13px; background: var(--paper-light); border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; }
+.room-log p { margin: 0 0 3px; }
+.room-log p.error { color: var(--vermilion); }
+
+.pond-area {
+  flex: 1;
+  min-height: 260px;
+  position: relative;
+  background: rgba(246, 239, 220, .6);
+  padding: 0;
+  overflow: hidden;
+}
+.pond-host, .pond-host > .pond { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pond-tools { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+.pond-tools button { background: rgba(251, 247, 236, .85); }
+.hint { color: var(--teal-deep); font-size: 15px; font-style: italic; min-height: 1.4em; }
+
+.banner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: 46px;
+  font-weight: 800;
+  color: var(--vermilion);
+  text-shadow: 0 0 16px rgba(255, 255, 255, .9), 0 0 4px white;
+  opacity: 0;
+}
+.banner.show { animation: banner 2.15s ease-out; }
+@keyframes banner {
+  0% { opacity: 0; transform: scale(.7); }
+  16% { opacity: 1; transform: scale(1); }
+  67% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* piccoli schermi: tutto in colonna, la pagina scorre */
+@media (max-width: 1080px) {
+  #room.active {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #room.active > * { flex-shrink: 0; }   /* in colonna ogni blocco tiene la sua altezza, la pagina scorre */
+  .room-left { overflow: visible; }
+  .pond-area { flex: none; height: 62vh; }
+  .room-right .others { flex: none; }
+  .opponents { overflow: visible; }
+}
+
+/* ---------------------------------------------------------------- tabellone */
+
+.board { display: flex; justify-content: center; gap: 14px; padding: 10px 8px 8px; overflow-x: auto; }
+.slot { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+.slot.slide { animation: slide-in .42s ease-out backwards; }
+@keyframes slide-in { from { opacity: 0; transform: translateX(-40px); } }
+.slot-effect { font-size: 12px; color: var(--teal-deep); text-align: center; white-space: pre-line; line-height: 1.25; }
+.slot-effect.pay { color: var(--vermilion); }
+
+.card {
+  width: 128px;
+  height: 168px;
+  background: var(--paper-light);
+  border: 1.5px solid var(--ink);
+  border-radius: 7px;
+  padding: 6px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 3px 10px rgba(64, 38, 13, .35);
+  transition: transform .16s, box-shadow .16s;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: center;
+}
+.card.drawable { cursor: pointer; }
+.card.drawable:hover { transform: translateY(-8px); box-shadow: 0 8px 18px rgba(64, 38, 13, .35); }
+.card:not(.drawable) { opacity: .88; }
+.card .band { align-self: stretch; height: 44px; border-radius: 5px; display: flex; align-items: center; gap: 6px; padding-left: 6px; overflow: hidden; }
+.card .card-name { font-weight: 800; font-size: 13px; }
+.card .card-name.long { font-size: 10px; }
+.card .card-text { white-space: pre-line; line-height: 1.3; }
+.card .card-number { margin-top: auto; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+.card.empty { background: rgba(255, 255, 255, .18); border: 1.5px dashed var(--ink-soft); box-shadow: none; justify-content: center; color: var(--ink-soft); font-size: 12px; }
+
+.seal {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 22%;
+  color: var(--paper-light);
+  font-family: var(--serif);
+  font-weight: 800;
+  transform: rotate(-4deg);
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------- plancia del giocatore */
+
+.player-panel { display: flex; flex-direction: column; gap: 12px; }
+.player-panel .me-name { font-size: 22px; font-weight: 800; }
+.wealth { display: flex; gap: 16px; align-items: center; }
+.count { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 16px; }
+.wealth { flex-wrap: wrap; }
+.fortune-button { display: inline-flex; align-items: center; gap: 6px; }
+.fortune-button:disabled { opacity: .45; cursor: default; background: transparent; }
+.storage { display: flex; gap: 3px; flex-wrap: wrap; }
+.storage svg { width: 24px; height: 21px; }
+.tokens { display: flex; flex-wrap: wrap; gap: 10px; }
+.token { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 8px; font-size: 12px; background: none; color: var(--ink); border: none; }
+.token svg { width: 46px; height: 42px; transition: transform .12s; overflow: visible; }
+.token.placeable { cursor: pointer; }
+.token.placeable:hover { background: transparent; }
+.token.placeable:hover svg { transform: scale(1.12); }
+.token:not(.placeable) { opacity: .6; cursor: default; }
+.token.selected { background: rgba(212, 161, 58, .35); }
+.token.selected svg { filter: drop-shadow(0 0 6px var(--gold)); }
+.card-line { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: pre-line; }
+
+.summary-name { font-weight: 800; font-size: 15px; }
+.summary-stats { display: flex; gap: 10px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+.opponent { background: rgba(195, 236, 241, .25); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+.opponent .pond { width: 100%; height: 140px; }
+
+/* ---------------------------------------------------------------- obiettivi */
+
+.objectives { display: flex; flex-direction: column; gap: 8px; }
+.objective {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px 6px 6px;
+  background: rgba(251, 247, 236, .9);
+  border: 1px solid rgba(111, 106, 94, .35);
+  border-radius: 6px;
+}
+.objective.claimable { border: 2px solid var(--gold); }
+.objective.finished { opacity: .5; }
+.objective > svg { width: 54px; height: 54px; flex-shrink: 0; }
+.objective .objective-title { display: flex; align-items: center; gap: 6px; font-weight: 800; }
+.objective .objective-title .spacer { flex: 1; }
+.objective small { display: block; font-size: 12px; color: var(--ink-soft); line-height: 1.3; }
+.badge { background: var(--vermilion); color: var(--paper-light); border-radius: 3px; padding: 1px 5px; font-size: 11px; font-weight: 400; }
+
+/* ---------------------------------------------------------------- domande e classifica */
+
+.question { width: min(460px, 100%); display: flex; flex-direction: column; gap: 16px; padding: 22px; animation: grow-in .3s ease-out; }
+.question-top { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 700; }
+.question-options { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.question-options button { width: 100%; text-align: left; }
+
+.scores { max-width: 100%; display: flex; flex-direction: column; gap: 14px; animation: grow-in .32s ease-out; }
+.scores-top { display: flex; align-items: center; gap: 14px; }
+.scores-top .kanji { font-size: 46px; }
+.scores-top h2 { font-size: 28px; }
+.scores .buttons { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.scores .note { font-size: 12px; }
+
+.offline { z-index: 50; }
+.offline-card { text-align: center; }
+
+/* ---------------------------------------------------------------- stagno (SVG) */
+
+.pond { display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pond.interactive { cursor: grab; }
+.pond.dragging { cursor: grabbing; }
+.pond .spot { cursor: pointer; animation: pulse .9s ease-in-out infinite alternate; }
+.pond .koi-holder.movable { cursor: pointer; }
+.pond .koi-holder.selected { filter: drop-shadow(0 0 6px var(--gold)) drop-shadow(0 0 10px var(--gold)); }
+.pond .swim { animation: swim 1.6s ease-in-out infinite alternate; }
+.pond .pop { animation: pop .48s ease-out backwards; }
+.pond .lantern-light { animation: flicker 1s ease-in-out infinite alternate; }
+.pond text.spot-label { font: 12px var(--serif); fill: var(--ink-soft); pointer-events: none; }
+@keyframes pulse { from { opacity: .55; } }
+@keyframes swim {
+  from { transform: rotate(-6deg) translateX(-1.6px); }
+  to { transform: rotate(6deg) translateX(1.6px); }
+}
+@keyframes pop {
+  0% { transform: scale(.2); opacity: 0; }
+  66% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes flicker {
+  from { filter: drop-shadow(0 0 2px #ffca28); }
+  to { filter: drop-shadow(0 0 7px #ffca28); }
+}
+
+/* telefono: cornici di legno piu' sottili e pulsanti del menu piu' piccoli */
+@media (max-width: 600px) {
+  .koi-panel { border-width: 20px; border-image-width: 20px; padding: 2px 4px 0; }
+  .heading-kanji { font-size: 36px; }
+  h2 { font-size: 22px; }
+  .menu-button { width: 240px; height: 80px; font-size: 19px; padding-top: 14px; }
+  .title-kanji { font-size: 60px; }
+  .title-name { font-size: 36px; margin-bottom: 8px; }
+  .player-corner { right: 16px; bottom: 16px; }
+  .wood-button { min-width: 0; padding: 12px 16px 8px; }
+  #room.active { padding: 8px; gap: 8px; }
+  .room-header { gap: 8px; padding: 8px; }
+  .room-header .turn-status { flex-basis: 100%; order: 1; }
+  .board { justify-content: flex-start; }
+  .banner { font-size: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pond .swim, .pond .spot, .pond .lantern-light, .pond .pop, .slot.slide { animation: none; }
+}

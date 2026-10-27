@@ -16,13 +16,16 @@ import network.MatchRecord;
 import network.GameView;
 import network.HexCoord;
 import network.ObjectiveView;
+import network.PlacementView;
 import network.PlayerView;
+import network.RoomInfo;
 import game.Cell;
 import game.GameRoom;
 import game.HexPosition;
 import game.Inventory;
 import game.KoiMarket;
 import game.PendingChoice;
+import game.Placement;
 import game.Player;
 import game.PlayerState;
 import game.Tile;
@@ -45,15 +48,18 @@ public class RoomController {
     private final Set<Player> readyPlayers = new HashSet<>();
     private Player endingTurn;   // giocatore che ha premuto End ma deve ancora rispondere sugli obiettivi
     private final Consumer<MatchRecord> onFinished;   // a fine partita: la lobby toglie la stanza e la mette nello storico
+    private final Runnable onAbandoned;               // non c'e' piu' nessuno: la lobby toglie la stanza
+    private final Set<Player> disconnected = new HashSet<>();   // giocatori in partita la cui connessione e' caduta
 
 
-    public RoomController(String id, String roomName, Consumer<MatchRecord> onFinished){
+    public RoomController(String id, String roomName, Consumer<MatchRecord> onFinished, Runnable onAbandoned){
         this.gameId = id;
         this.roomName = roomName;
         this.gameState = GameState.WAITING;
         this.game = new GameRoom();
         this.joinedPlayers = new LinkedHashMap<>();
         this.onFinished = onFinished;
+        this.onAbandoned = onAbandoned;
     }
 
     // il giocatore esce dalla stanza: si puo' in attesa (libera il posto) e a partita finita (torna al menu);
@@ -67,8 +73,24 @@ public class RoomController {
             game.removePlayer(player);
             readyPlayers.remove(player);
             sendMessageToAll(player.getName() + " ha lasciato la stanza");
+            if (joinedPlayers.isEmpty()) {
+                onAbandoned.run();   // stanza in attesa rimasta vuota: non resta nella lista
+            }
         }
         return true;
+    }
+
+    // la connessione e' caduta (pagina chiusa, rete persa). In attesa o a fine partita equivale a uscire;
+    // durante la partita il giocatore resta in gioco, ma se si scollegano tutti la stanza non serve piu'
+    public synchronized void disconnect(Player player) {
+        if (removePlayer(player)) {
+            return;
+        }
+        disconnected.add(player);
+        sendMessageToAll(player.getName() + " si è scollegato");
+        if (disconnected.size() == joinedPlayers.size()) {
+            onAbandoned.run();
+        }
     }
 
     // true se il giocatore e' entrato; e' la stanza a dire Joined, cosi' arriva prima del benvenuto
@@ -81,11 +103,27 @@ public class RoomController {
             client.send(new ServerMessage.ErrorMessage("La stanza è piena"));
             return false;
         }
+        // il client riconosce se stesso dal nome (GameView.viewer): due nomi uguali lo confonderebbero
+        for (Player other : joinedPlayers.keySet()) {
+            if (other.getName().equalsIgnoreCase(newPlayer.getName())) {
+                client.send(new ServerMessage.ErrorMessage("Nella stanza c'è già un giocatore di nome " + other.getName()));
+                return false;
+            }
+        }
         joinedPlayers.put(newPlayer, client);
         game.addPlayer(newPlayer);
-        client.send(new ServerMessage.Joined(gameId));
-        client.send(new ServerMessage.Info("Benvenuto nella partita, " + newPlayer.getName()));
+        client.send(new ServerMessage.Joined(gameId, roomName));
+        sendMessageToAll(newPlayer.getName() + " è entrato nella stanza");
         return true;
+    }
+
+    // la riga della stanza nella lista della lobby
+    public synchronized RoomInfo info() {
+        List<String> names = new ArrayList<>();
+        for (Player player : joinedPlayers.keySet()) {
+            names.add(player.getName());
+        }
+        return new RoomInfo(gameId, roomName, names, gameState == GameState.WAITING && !game.isFull());
     }
 
     public synchronized void startGame(Player player) {
@@ -150,10 +188,20 @@ public class RoomController {
         PendingChoice pending = game.getPendingChoice();
         String question = null;
         List<String> options = List.of();
+        List<PlacementView> placements = new ArrayList<>();
         if (pending != null) {
             if (pending.player() == viewer) {
                 question = pending.question();
                 options = pending.options();
+                for (int option = 0; option < pending.placements().size(); option++) {
+                    Placement placement = pending.placements().get(option);
+                    List<HexCoord> cells = new ArrayList<>();
+                    for (HexPosition cell : placement.cells()) {
+                        cells.add(new HexCoord(cell.q(), cell.r()));
+                    }
+                    placements.add(new PlacementView(option, new HexCoord(placement.anchor().q(), placement.anchor().r()),
+                            placement.rotation(), cells));
+                }
             } else {
                 question = "In attesa della scelta di " + pending.player().getName();
             }
@@ -225,7 +273,7 @@ public class RoomController {
 
         return new GameView(viewer.getName(), active == null ? null : active.getName(), board,
             market.getSmallKoiLeft(), market.getMediumKoiLeft(), market.getBigKoiLeft(), players,
-            question, options, playable, rotations, canDraw, objectives);
+            question, options, playable, rotations, canDraw, objectives, placements);
     }
 
     private PlayerView buildPlayerView(Player player) {

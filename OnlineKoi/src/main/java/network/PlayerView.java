@@ -1,6 +1,5 @@
 package network;
 
-import java.io.Serializable;
 import java.util.List;
 
 // fotografia di un giocatore inviata ai client: solo testo e numeri, cosi' attraversa la rete senza problemi
@@ -14,7 +13,7 @@ public record PlayerView(
         List<String> helpers,
         List<String> cards,
         List<String> scrolls,
-        List<CellView> pond) implements Serializable {
+        List<CellView> pond) {
 
     public PlayerView {
         tiles = List.copyOf(tiles);

@@ -1,12 +1,14 @@
 package server;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import network.MatchRecord;
+import network.RoomInfo;
 
 public class Lobby {
 
@@ -24,14 +26,22 @@ public class Lobby {
 
 	public String createRoom(String roomName) {
 		String gameRoomId = String.valueOf(createID());
-		// a fine partita la stanza si toglie dalla lista e la partita passa nello storico
-		RoomController newGameRoom = new RoomController(gameRoomId, roomName, match -> finishRoom(gameRoomId, match));
+		// a fine partita la stanza si toglie dalla lista e la partita passa nello storico;
+		// se restano senza nessuno (tutti usciti o scollegati) si toglie e basta
+		RoomController newGameRoom = new RoomController(gameRoomId, roomName, match -> finishRoom(gameRoomId, match),
+				() -> activeGames.remove(gameRoomId));
 		activeGames.put(gameRoomId,newGameRoom);
 		return gameRoomId;
 	}
 
-	public List<String> listRooms() {
-		return Collections.list(activeGames.keys());
+	// le stanze in ordine di creazione, con nome e giocatori
+	public List<RoomInfo> listRooms() {
+		List<RoomInfo> rooms = new ArrayList<>();
+		for (RoomController room : activeGames.values()) {
+			rooms.add(room.info());
+		}
+		rooms.sort(Comparator.comparingLong(room -> Long.parseLong(room.id())));
+		return rooms;
 	}
 
 	private static long createID()

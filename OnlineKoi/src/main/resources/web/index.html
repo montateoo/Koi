@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Koi</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/koi-32.png">
+  <link rel="icon" type="image/png" sizes="256x256" href="assets/icons/koi-256.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700;800&display=swap">
+  <link rel="stylesheet" href="css/koi.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+
+  <!-- schermata iniziale: il nero svanisce sul laghetto, l'immagine si avvicina piano e compare il menu -->
+  <section id="title" class="screen active">
+    <div class="title-bg"></div>
+    <div class="title-shade"></div>
+    <div class="title-menu">
+      <div class="kanji title-kanji">鯉</div>
+      <h1 class="title-name">K O I</h1>
+      <div class="menu-buttons">
+        <button class="menu-button" data-action="play">Gioca</button>
+        <button class="menu-button" data-action="create">Crea Stanza</button>
+        <button class="menu-button" data-action="history">Storico</button>
+        <button class="menu-button" data-action="settings">Impostazioni</button>
+      </div>
+    </div>
+    <div class="player-corner">
+      <span class="player-name" data-action="nickname"></span>
+      <button class="player-button" data-action="nickname" title="Il tuo nome" aria-label="Il tuo nome">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z"/></svg>
+      </button>
+    </div>
+    <div class="curtain"></div>
+  </section>
+
+  <!-- lista delle stanze -->
+  <section id="lobby" class="screen pond-backdrop">
+    <div class="koi-panel lobby-card">
+      <div class="panel-heading"><span class="kanji heading-kanji">鯉</span><h2>Stanze</h2></div>
+      <p class="muted lobby-player"></p>
+      <ul class="room-list" tabindex="0"></ul>
+      <div class="row">
+        <button class="wood-button" data-action="menu">← Menu</button>
+        <span class="spacer"></span>
+        <button class="wood-button" data-action="refresh">Aggiorna</button>
+        <button class="wood-button" data-action="join">Entra</button>
+      </div>
+      <p class="muted lobby-status"></p>
+    </div>
+  </section>
+
+  <!-- storico delle partite -->
+  <section id="history" class="screen pond-backdrop">
+    <div class="koi-panel history-card">
+      <div class="panel-heading">
+        <span class="kanji heading-kanji">記</span><h2>Storico partite</h2>
+        <span class="spacer"></span>
+        <button class="wood-button" data-action="menu">← Menu</button>
+      </div>
+      <div class="history-body">
+        <ul class="match-list"></ul>
+        <div class="match-details"></div>
+      </div>
+      <p class="muted history-status"></p>
+    </div>
+  </section>
+
+  <!-- la stanza: tabellone e stagno al centro, plancia a sinistra, obiettivi e avversari a destra -->
+  <section id="room" class="screen">
+    <header class="room-header panel">
+      <span class="kanji room-logo">鯉</span>
+      <span class="room-title"></span>
+      <span class="turn-status"></span>
+      <span class="spacer"></span>
+      <button class="ghost" data-action="scores" hidden>Classifica</button>
+      <button data-action="start">Inizia</button>
+      <button data-action="end-turn">Passa il turno</button>
+      <button data-action="home" hidden>Menu</button>
+      <button class="ghost" data-action="quit">Esci</button>
+    </header>
+    <aside class="room-left panel"><div class="player-panel"></div></aside>
+    <main class="room-centre">
+      <div class="board panel"></div>
+      <div class="pond-area panel">
+        <div class="pond-host"></div>
+        <div class="pond-tools">
+          <button class="ghost small" data-action="rotate" hidden title="Ruota (R)">↻ Ruota</button>
+          <button class="ghost small" data-action="cancel" hidden title="Annulla (Esc)">✕ Annulla</button>
+          <button class="ghost small" data-action="reset-view" title="Vista iniziale (doppio clic)">⌖</button>
+        </div>
+        <div class="banner"></div>
+      </div>
+      <p class="hint"></p>
+    </main>
+    <aside class="room-right">
+      <div class="panel"><h3 class="panel-title">Obiettivi</h3><div class="objectives"></div></div>
+      <div class="panel others"><h3 class="panel-title">Altri stagni</h3><div class="opponents"></div></div>
+      <div class="panel"><h3 class="panel-title">Messaggi</h3><div class="room-log" aria-live="polite"></div></div>
+    </aside>
+    <div class="layer question-layer" hidden></div>
+    <div class="layer scores-layer" hidden></div>
+  </section>
+
+  <canvas class="sakura"></canvas>
+  <div class="layer dialog-layer" hidden></div>
+  <div class="toast" role="status"></div>
+  <div class="layer offline" hidden>
+    <div class="koi-panel offline-card"><h2>Connessione persa</h2><p class="muted">Provo a ricollegarmi al server…</p></div>
+  </div>
+</body>
+</html>

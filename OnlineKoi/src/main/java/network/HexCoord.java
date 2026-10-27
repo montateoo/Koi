@@ -1,8 +1,6 @@
 package network;
 
-import java.io.Serializable;
-
-public record HexCoord(int q, int r) implements Serializable {
+public record HexCoord(int q, int r) {
 
     @Override
     public String toString() {

@@ -1,79 +1,68 @@
 package server;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.Socket;
 import java.util.function.Consumer;
 
 import game.Player;
 import messages.ClientMessage;
-import messages.SerialFilters;
 import messages.ServerMessage;
 
-// un client collegato: legge i suoi messaggi e li smista alla lobby o alla sua stanza
-public class ClientHandler implements Runnable {
+// un client collegato: riceve i suoi messaggi dal trasporto e li smista alla lobby o alla sua stanza.
+// Non sa nulla di socket o WebSocket: le risposte partono dalla Connection
+public class ClientHandler {
 
-    private final Socket socket;
+    static final int MAX_NAME = 20;        // nome del giocatore
+    static final int MAX_ROOM_NAME = 30;   // nome della stanza
+
     private final Lobby lobby;
-    private final ObjectOutputStream out;
-    private final ObjectInputStream in;
+    private final Connection connection;
     private Player player;          // null finche' il client non entra in una stanza
     private RoomController room;    // idem
 
-    public ClientHandler(Socket socket, Lobby lobby) throws IOException {
-        this.socket = socket;
+    public ClientHandler(Lobby lobby, Connection connection) {
         this.lobby = lobby;
-        out = new ObjectOutputStream(socket.getOutputStream());   // stesso ordine del client: prima l'output
-        out.flush();
-        in = new ObjectInputStream(socket.getInputStream());
-        in.setObjectInputFilter(SerialFilters.FROM_CLIENT);   // da internet accettiamo solo i ClientMessage
+        this.connection = connection;
     }
 
-    // non lancia eccezioni: se il client e' sparito si chiude e basta, il server non deve fermarsi
-    public synchronized void send(ServerMessage message) {
+    public void send(ServerMessage message) {
+        connection.send(message);
+    }
+
+    // un messaggio alla volta per client: il trasporto li consegna in ordine
+    public void handle(ClientMessage message) {
         try {
-            out.writeObject(message);
-            out.reset();
-            out.flush();
-        } catch (IOException e) {
-            close();
+            dispatch(message);
+        } catch (RuntimeException e) {
+            // un errore nel codice del gioco non deve far cadere la connessione
+            send(new ServerMessage.ErrorMessage("Errore del server: " + e.getMessage()));
         }
     }
 
-    @Override
-    public void run() {
-        try {
-            while (true) {
-                ClientMessage message = (ClientMessage) in.readObject();
-                try {
-                    handle(message);
-                } catch (RuntimeException e) {
-                    // un errore nel codice del gioco non deve far cadere la connessione
-                    send(new ServerMessage.ErrorMessage("Errore del server: " + e.getMessage()));
-                }
-            }
-        } catch (IOException | ClassNotFoundException e) {
-            // il client si e' scollegato (o ha chiuso con Leave)
-        } finally {
-            if (room != null) {
-                room.removePlayer(player);   // client sparito: in attesa o a fine partita libera il posto
-            }
-            close();
+    // la connessione e' caduta (o il client ha chiuso la pagina): la stanza decide cosa farne
+    public void disconnected() {
+        if (room != null) {
+            room.disconnect(player);
+            room = null;
+            player = null;
         }
     }
 
-    private void handle(ClientMessage message) {
+    private void dispatch(ClientMessage message) {
         switch (message) {
             // lobby: sempre permessi
             case ClientMessage.ListRooms() -> send(new ServerMessage.RoomList(lobby.listRooms()));
             case ClientMessage.CreateRoom(String name) -> {
-                String id = lobby.createRoom(name);
-                send(new ServerMessage.Info("Stanza " + id + " creata"));
-                send(new ServerMessage.RoomList(lobby.listRooms()));
+                if (validRoomName(name)) {
+                    lobby.createRoom(name.trim());
+                    send(new ServerMessage.Info("Stanza \"" + name.trim() + "\" creata"));
+                    send(new ServerMessage.RoomList(lobby.listRooms()));
+                }
             }
             case ClientMessage.JoinRoom(String roomId, String nickname) -> join(roomId, nickname);
-            case ClientMessage.CreateAndJoinRoom(String name, String nickname) -> join(lobby.createRoom(name), nickname);
+            case ClientMessage.CreateAndJoinRoom(String name, String nickname) -> {
+                if (validRoomName(name) && validNickname(nickname) && notInRoom()) {
+                    join(lobby.createRoom(name.trim()), nickname);
+                }
+            }
             case ClientMessage.Leave() -> leaveRoom();
             case ClientMessage.ListHistory() -> send(new ServerMessage.History(lobby.history()));
 
@@ -87,36 +76,64 @@ public class ClientHandler implements Runnable {
             case ClientMessage.PlaceLily(int q, int r) -> inRoom(room -> room.placeLily(player, q, r));
             case ClientMessage.PlaceLantern(int q, int r) -> inRoom(room -> room.placeLantern(player, q, r));
             case ClientMessage.PlaceBorder(int q, int r, int angle) -> inRoom(room -> room.placeBorder(player, q, r, angle));
-            case ClientMessage.PlaceKoi(int type, int q, int r, int angle) -> inRoom(room -> room.placeKoi(player, type, q, r, angle));
+            case ClientMessage.PlaceKoi(int size, int q, int r, int angle) -> inRoom(room -> room.placeKoi(player, size, q, r, angle));
             case ClientMessage.MoveKoi(int koiId, int q, int r, int angle) -> inRoom(room -> room.moveKoi(player, koiId, q, r, angle));
             case ClientMessage.SpendLuckyCard() -> inRoom(room -> room.spendLuckyCard(player));
-           
-
         }
     }
 
-    private void join(String roomId, String nickname){
-        if(room!=null){
-            send(new ServerMessage.ErrorMessage("Sei già in una stanza"));
+    private void join(String roomId, String nickname) {
+        if (!notInRoom() || !validNickname(nickname)) {
+            return;
+        }
+        RoomController chosen = roomId == null ? null : lobby.getRoom(roomId);
+        if (chosen == null) {
+            send(new ServerMessage.ErrorMessage("Questa stanza non esiste più"));
             return;
         }
 
-        RoomController chosen = lobby.getRoom(roomId);
-        
-        if(chosen==null){
-            send(new ServerMessage.ErrorMessage("Questa stanza non esiste"));
-            return;
-        }
-
-        Player newPlayer = new Player(nickname);
+        Player newPlayer = new Player(nickname.trim());
         if (chosen.addPlayer(newPlayer, this)) {   // Joined lo manda la stanza
             player = newPlayer;
             room = chosen;
         }
     }
 
-    private void inRoom(Consumer<RoomController> action){
-        if(room==null){
+    // i nomi arrivano da un browser: niente vuoti, niente lunghissimi
+    private boolean validNickname(String nickname) {
+        if (nickname == null || nickname.isBlank()) {
+            send(new ServerMessage.ErrorMessage("Scegli un nome prima di entrare"));
+            return false;
+        }
+        if (nickname.trim().length() > MAX_NAME) {
+            send(new ServerMessage.ErrorMessage("Il nome può avere al massimo " + MAX_NAME + " caratteri"));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean validRoomName(String name) {
+        if (name == null || name.isBlank()) {
+            send(new ServerMessage.ErrorMessage("Scrivi un nome per la stanza"));
+            return false;
+        }
+        if (name.trim().length() > MAX_ROOM_NAME) {
+            send(new ServerMessage.ErrorMessage("Il nome della stanza può avere al massimo " + MAX_ROOM_NAME + " caratteri"));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean notInRoom() {
+        if (room != null) {
+            send(new ServerMessage.ErrorMessage("Sei già in una stanza"));
+            return false;
+        }
+        return true;
+    }
+
+    private void inRoom(Consumer<RoomController> action) {
+        if (room == null) {
             send(new ServerMessage.ErrorMessage("Prima entra in una stanza"));
         } else {
             action.accept(room);
@@ -135,13 +152,4 @@ public class ClientHandler implements Runnable {
         room = null;
         player = null;
     }
-
-    private void close(){
-        try {
-            socket.close();   // sblocca anche readObject in run(), che esce con un'eccezione
-        } catch (IOException e) {
-            // stiamo chiudendo comunque
-        }
-    }
 }
-

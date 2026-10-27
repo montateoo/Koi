@@ -1,21 +1,26 @@
 package server;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
-import messages.SerialFilters;
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import messages.Json;
 import network.MatchRecord;
 
-// lo storico delle partite su disco, cosi' sopravvive ai riavvii del server.
+// lo storico delle partite su disco, cosi' sopravvive ai riavvii del server. E' JSON, come i messaggi:
+// si puo' aprire e leggere con un editor.
 // Posizione: $KOI_HISTORY se impostata, altrimenti la cartella dati dell'utente (standard XDG su Linux):
-// $XDG_DATA_HOME/koi/history.dat oppure ~/.local/share/koi/history.dat
+// $XDG_DATA_HOME/koi/history.json oppure ~/.local/share/koi/history.json
 final class HistoryStore {
+
+    private static final TypeReference<List<MatchRecord>> MATCHES = new TypeReference<>() { };
 
     private final Path file;
 
@@ -32,7 +37,7 @@ final class HistoryStore {
         Path dataDir = (xdg != null && !xdg.isBlank())
                 ? Path.of(xdg)
                 : Path.of(System.getProperty("user.home"), ".local", "share");
-        return dataDir.resolve("koi").resolve("history.dat");
+        return dataDir.resolve("koi").resolve("history.json");
     }
 
     Path file() {
@@ -41,16 +46,14 @@ final class HistoryStore {
 
     // all'avvio. Un file illeggibile (rovinato, o di una versione vecchia del gioco) viene messo da parte
     // come .bak e si riparte da uno storico vuoto: il server deve partire comunque
-    @SuppressWarnings("unchecked")
     List<MatchRecord> load() {
         if (!Files.exists(file)) {
             return new ArrayList<>();
         }
-        try (ObjectInputStream in = new ObjectInputStream(Files.newInputStream(file))) {
-            in.setObjectInputFilter(SerialFilters.FROM_SERVER);   // le stesse classi che il client accetta dal server
-            return new ArrayList<>((List<MatchRecord>) in.readObject());
-        } catch (IOException | ClassNotFoundException | ClassCastException e) {
-            System.err.println("Storico illeggibile (" + e + "): lo metto da parte e riparto da zero");
+        try (InputStream in = Files.newInputStream(file)) {
+            return new ArrayList<>(Json.mapper().readValue(in, MATCHES));
+        } catch (IOException e) {
+            System.err.println("Storico illeggibile (" + e.getMessage() + "): lo metto da parte e riparto da zero");
             try {
                 Files.move(file, file.resolveSibling(file.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException ignored) {
@@ -66,8 +69,8 @@ final class HistoryStore {
         try {
             Files.createDirectories(file.getParent());
             Path temp = file.resolveSibling(file.getFileName() + ".tmp");
-            try (ObjectOutputStream out = new ObjectOutputStream(Files.newOutputStream(temp))) {
-                out.writeObject(List.copyOf(matches));
+            try (OutputStream out = Files.newOutputStream(temp)) {
+                Json.mapper().writerFor(MATCHES).withDefaultPrettyPrinter().writeValue(out, List.copyOf(matches));
             }
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {

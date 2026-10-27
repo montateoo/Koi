@@ -1,6 +1,5 @@
 package network;
 
-import java.io.Serializable;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,7 +19,8 @@ public record GameView(
         Map<String, List<HexCoord>> playablePositions,
         Map<String, Map<HexCoord, List<Integer>>> rotations,
         boolean canDraw,
-        List<ObjectiveView> objectives) implements Serializable {
+        List<ObjectiveView> objectives,
+        List<PlacementView> placements) {
 
 
     public GameView {
@@ -28,6 +28,8 @@ public record GameView(
         players = List.copyOf(players);
         options = options == null ? List.of() : List.copyOf(options);
         objectives = objectives == null ? List.of() : List.copyOf(objectives);
+        // la domanda aperta si risponde cliccando lo stagno: un elemento per opzione (solo per chi deve rispondere)
+        placements = placements == null ? List.of() : List.copyOf(placements);
 
         Map<String, List<HexCoord>> copy = new LinkedHashMap<>();
         if (playablePositions != null) {

@@ -1,10 +1,8 @@
 package messages;
 
-import java.io.Serializable;
-
 // tutto quello che il client puo' chiedere al server: un record per ogni azione.
 // "sealed": solo questi record sono ClientMessage, cosi' uno switch del server che ne dimentica uno non compila
-public sealed interface ClientMessage extends Serializable {
+public sealed interface ClientMessage {
 
     // ---------------------------------------------------------------- lobby
 
@@ -45,8 +43,8 @@ public sealed interface ClientMessage extends Serializable {
 
     record PlaceBorder(int q, int r, int angle) implements ClientMessage { }
 
-    // type: 0 piccola, 1 media, 2 grande
-    record PlaceKoi(int type, int q, int r, int angle) implements ClientMessage { }
+    // size: 0 piccola, 1 media, 2 grande (non "type": in JSON quel campo e' il nome del messaggio)
+    record PlaceKoi(int size, int q, int r, int angle) implements ClientMessage { }
 
     record MoveKoi(int koiId, int q, int r, int angle) implements ClientMessage { }
 

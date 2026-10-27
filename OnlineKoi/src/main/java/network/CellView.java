@@ -1,6 +1,5 @@
 package network;
 
-import java.io.Serializable;
 import java.util.List;
 
 // un esagono occupato dello stagno, cosi' come lo vede il client.
@@ -15,7 +14,7 @@ public record CellView(
         int topRotation,
         int tileId,
         int topId,
-        List<Boolean> blueSides) implements Serializable {
+        List<Boolean> blueSides) {
 
     public CellView {
         blueSides = List.copyOf(blueSides);

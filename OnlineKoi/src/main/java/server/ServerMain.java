@@ -1,38 +1,26 @@
 package server;
 
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-
 public class ServerMain {
 
-    public static final int PORT = 1099;   // la stessa che usano TextView e le Impostazioni del client
+    // di default ascolta solo sulla macchina stessa: da fuori si arriva attraverso Tailscale Funnel (o un proxy).
+    // KOI_HOST=0.0.0.0 lo apre alla rete locale, utile per provare dal telefono di casa.
+    // KOI_WEB_DIR=src/main/resources/web serve la pagina dai sorgenti: si modifica e si ricarica il browser
+    public static final String DEFAULT_HOST = "127.0.0.1";
+    public static final int DEFAULT_PORT = 8080;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         HistoryStore store = new HistoryStore(HistoryStore.defaultLocation());
         Lobby lobby = new Lobby(store);
         System.out.println("Storico partite: " + store.file() + " (" + lobby.history().size() + (lobby.history().size() == 1 ? " partita)" : " partite)"));
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server pronto sulla porta " + PORT);
-            while (true) {
-                Socket socket = serverSocket.accept();   // aspetta il prossimo client
-                Thread.ofVirtual().start(() -> serve(socket, lobby));
-            }
-        }
+
+        String host = env("KOI_HOST", DEFAULT_HOST);
+        int port = Integer.parseInt(env("KOI_PORT", String.valueOf(DEFAULT_PORT)));
+        new WebServer(lobby).start(host, port, env("KOI_WEB_DIR", null));
+        System.out.println("Server pronto su http://" + host + ":" + port);
     }
 
-    private static void serve(Socket socket, Lobby lobby) {
-
-        try {
-            ClientHandler clientHandler = new ClientHandler(socket,lobby);
-            clientHandler.run();
-        } catch (IOException e) {
-            try {
-                socket.close();
-            } catch (IOException e1) {
-                // il client non ha mai parlato: niente da fare
-            }
-        }
+    private static String env(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 }
-

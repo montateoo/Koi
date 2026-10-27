@@ -293,6 +293,28 @@ public class Pond {
     }
 
 
+    // gli esagoni che una tessera occuperebbe con quell'ancoraggio e quella rotazione (come in validRotations):
+    // serve per l'anteprima nel client
+    public List<HexPosition> footprint(TileType tileType, HexPosition anchor, int rotation) {
+        switch (tileType) {
+            case BORDER:
+            case STATUE:
+            case BRIDGE:
+            case WATERFALL:
+                return borderCells(anchor, rotation);
+            case THREE:
+                return shapeCells(tileType.footprint(), anchor, rotation, false);
+            case SMALLKOI:
+            case MEDIUMKOI:
+            case BIGKOI:
+                return koiCells(tileType, anchor, rotation);
+            default:
+                return tileType.isObjective() && tileType.isTopTile()
+                        ? objectiveCells(tileType, anchor, rotation % 6, rotation >= 6)
+                        : List.of(anchor);
+        }
+    }
+
     public List<Integer> validBorderRotations(HexPosition center) {
         return validRotations(TileType.BORDER, center);
     }

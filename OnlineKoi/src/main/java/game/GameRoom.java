@@ -272,16 +272,13 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
             return;
         }
 
-        List<String> labels = new ArrayList<>();
-        for (HexPosition position : positions) {
-            labels.add(position.toString());
-        }
         pendingChoices.add(new PendingChoice(player,
-                "Pioggia: dove piazzi questa tessera (" + type.displayName() + ")?", labels,
+                "Pioggia: dove piazzi questa tessera (" + type.displayName() + ")?", labels(positions),
                 option -> {
                     player.getPond().place(takeFromReserve(type), positions.get(option));
                     askRainPlacement(player, rest);
-                }));
+                },
+                singleHex(positions)));
     }
 
 	@Override
@@ -508,47 +505,54 @@ public class GameRoom implements CardEffects, BoardListener, WarehouseListener, 
     // gli obiettivi vanno piazzati subito: domanda con coordinate, cosi' nella GUI si clicca lo stagno
     private void askPathPlacement(Player player, Tile tile) {
         List<HexPosition> positions = player.getPlayablePositions(TileType.PATH);
+        pendingChoices.add(new PendingChoice(player, "Dove piazzi il Percorso?", labels(positions),
+                option -> player.getPond().placePath(tile, positions.get(option)),
+                singleHex(positions)));
+    }
+
+    // domande di piazzamento: le coordinate come testo ("(1,-2)") e, per il client, un esagono per opzione
+    private static List<String> labels(List<HexPosition> positions) {
         List<String> labels = new ArrayList<>();
         for (HexPosition position : positions) {
             labels.add(position.toString());
         }
-        pendingChoices.add(new PendingChoice(player, "Dove piazzi il Percorso?", labels,
-                option -> player.getPond().placePath(tile, positions.get(option))));
+        return labels;
     }
 
-    // obiettivi con una forma (rami, shishi odoshi, carpa centenaria, tartaruga, ninfea viola):
-    // prima dove (coordinate, si clicca lo stagno), poi come orientarla se c'e' piu' di un modo; infine "then"
+    private static List<Placement> singleHex(List<HexPosition> positions) {
+        List<Placement> placements = new ArrayList<>();
+        for (HexPosition position : positions) {
+            placements.add(new Placement(position, 0, List.of(position)));
+        }
+        return placements;
+    }
+
+    // obiettivi da piazzare nello stagno (rami, shishi odoshi, carpa centenaria, tartaruga, ninfea viola, ponticello,
+    // statua, cascata, salice): una sola domanda, un'opzione per ogni posizione e rotazione valida, ciascuna con
+    // gli esagoni che occuperebbe. Nel client si clicca lo stagno con l'anteprima, come per la sponda; infine "then"
     private void askObjectivePlacement(Player player, Tile tile, Runnable then) {
         TileType type = tile.getTileType();
-        List<HexPosition> positions = player.getPlayablePositions(type);
-        if (positions.isEmpty()) {
+        List<String> labels = new ArrayList<>();
+        List<Placement> placements = new ArrayList<>();
+        for (HexPosition position : player.getPlayablePositions(type)) {
+            List<Integer> rotations = player.validRotations(type, position);
+            for (int rotation : rotations) {
+                labels.add(position + (rotations.size() == 1 ? ""
+                        : " rotazione " + (rotation % 6) + (rotation >= 6 ? " (specchiata)" : "")));
+                placements.add(new Placement(position, rotation, player.getPond().footprint(type, position, rotation)));
+            }
+        }
+        if (placements.isEmpty()) {
             then.run();   // non dovrebbe succedere: il requisito garantisce un posto (la tessera resta registrata da claim)
             return;
         }
-        List<String> labels = new ArrayList<>();
-        for (HexPosition position : positions) {
-            labels.add(position.toString());
-        }
         pendingChoices.add(new PendingChoice(player, "Dove piazzi questa tessera (" + type.displayName() + ")?", labels,
-                option -> askObjectiveRotation(player, tile, positions.get(option), then)));
-    }
-
-    private void askObjectiveRotation(Player player, Tile tile, HexPosition anchor, Runnable then) {
-        List<Integer> rotations = player.validRotations(tile.getTileType(), anchor);
-        if (rotations.size() == 1) {
-            player.getPond().placeObjective(tile, anchor, rotations.get(0));
-            then.run();
-            return;
-        }
-        List<String> labels = new ArrayList<>();
-        for (int rotation : rotations) {
-            labels.add("Rotazione " + (rotation % 6) + (rotation >= 6 ? " (specchiata)" : ""));
-        }
-        pendingChoices.add(new PendingChoice(player, "Come giri questa tessera (" + tile.getTileType().displayName() + ")?", labels,
                 option -> {
-                    player.getPond().placeObjective(tile, anchor, rotations.get(option));
+                    Placement chosen = placements.get(option);
+                    player.getPond().placeObjective(tile, chosen.anchor(), chosen.rotation());
                     then.run();
-                }));
+                },
+                placements));
     }
 
     // tessere che askObjectivePlacement sa gia' piazzare; le altre (ponticello, statua...) per ora restano da parte
